@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}GASGUARD X - Industrial Safety & Incident Audit Report{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-xl-5">
+
+  <!-- Header & Report Selector (Hidden in Print) -->
+  <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2 no-print">
+    <div>
+      <h3 class="text-white fw-bold mb-1"><i class="bi bi-file-earmark-pdf-fill text-danger"></i> Official Incident Safety &amp; Audit Report</h3>
+      <p class="text-muted small mb-0">Compliant industrial HSE documentation with multi-layer alarm forensic logs.</p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <!-- Incident Selector -->
+      <form method="GET" action="{{ url_for('reports_view') }}" class="d-flex align-items-center gap-2">
+        <label class="text-light small text-nowrap">Select Incident:</label>
+        <select name="incident_id" class="form-select form-select-sm bg-dark text-white border-secondary" onchange="this.form.submit()">
+          {% for inc in all_incidents %}
+          <option value="{{ inc.incident_id }}" {% if incident and inc.incident_id == incident.incident_id %}selected{% endif %}>
+            {{ inc.incident_id }} ({{ inc.gas_type }} - {{ inc.zone }})
+          </option>
+          {% endfor %}
+        </select>
+      </form>
+
+      <!-- Print Button -->
+      <button class="btn btn-sm btn-info text-dark fw-bold" onclick="window.print()">
+        <i class="bi bi-printer-fill"></i> Print / Export PDF
+      </button>
+    </div>
+  </div>
+
+  {% if incident %}
+  <!-- Printable Formal HSE Audit Report Document -->
+  <div class="glass-panel p-4 p-md-5 mb-5 mx-auto" style="max-width: 900px; background: rgba(18, 26, 43, 0.95);">
+    <!-- Report Header -->
+    <div class="d-flex justify-content-between align-items-start border-bottom border-secondary pb-3 mb-4 flex-wrap gap-2">
+      <div>
+        <div class="d-flex align-items-center gap-2 mb-1">
+          <span class="brand-badge">GASGUARD X</span>
+          <span class="text-muted fw-bold">INDUSTRIAL SAFETY AUDIT LOG</span>
+        </div>
+        <h3 class="text-white fw-bold mb-0">CRITICAL INCIDENT INVESTIGATION REPORT</h3>
+        <small class="text-muted">OSHA CFR 1910.119 Process Safety Management (PSM) Support Format</small>
+      </div>
+      <div class="text-end">
+        <div class="fs-5 fw-bold text-info font-monospace">{{ incident.incident_id }}</div>
+        <small class="text-muted">Date: {{ incident.timestamp }}</small>
+      </div>
+    </div>
+
+    <!-- Executive Classification Block -->
+    <div class="row g-3 mb-4">
+      <div class="col-4">
+        <div class="p-3 bg-dark bg-opacity-50 rounded border border-secondary border-opacity-25">
+          <small class="text-muted text-uppercase fw-bold">Incident Threat Rating</small>
+          <div class="fs-4 fw-bold text-{{ 'danger' if incident.risk_level == 'CRITICAL' else 'warning' }}">{{ incident.risk_level }}</div>
+          <small class="text-muted">Risk Score: {{ incident.risk_score }}/100</small>
+        </div>
+      </div>
+      <div class="col-4">
+        <div class="p-3 bg-dark bg-opacity-50 rounded border border-secondary border-opacity-25">
+          <small class="text-muted text-uppercase fw-bold">Hazardous Gas Type</small>
+          <div class="fs-4 fw-bold text-warning">{{ incident.gas_type }}</div>
+          <small class="text-danger font-monospace">Peak: {{ incident.concentration_ppm }} PPM</small>
+        </div>
+      </div>
+      <div class="col-4">
+        <div class="p-3 bg-dark bg-opacity-50 rounded border border-secondary border-opacity-25">
+          <small class="text-muted text-uppercase fw-bold">Facility Location</small>
+          <div class="fs-4 fw-bold text-white">{{ incident.zone }}</div>
+          <small class="text-muted">Asset: {{ incident.equipment }}</small>
+        </div>
+      </div>
+    </div>
+
+    <!-- Forensic Incident Chronology & Innovation Failover Details -->
+    <h5 class="text-white border-bottom border-secondary pb-2 mb-3">1. Multi-Layer Alarm Failover &amp; Safety Systems Audit</h5>
+    <div class="table-responsive mb-4">
+      <table class="table table-sm table-custom">
+        <tbody>
+          <tr>
+            <th style="width: 35%;">Primary Audible Alarm State:</th>
+            <td>
+              <span class="badge bg-{{ 'danger' if incident.primary_alarm_status == 'FAILED' else 'success' }} fs-6">
+                {{ incident.primary_alarm_status }}
+              </span>
+              <span class="text-muted small ms-2">(15s SCADA acknowledgment timeout / breaker trip detected)</span>
+            </td>
+          </tr>
+          <tr>
+            <th>Autonomous Multi-Layer Failover:</th>
+            <td>
+              <span class="badge bg-success fs-6">{{ incident.backup_alert_status }}</span>
+              <span class="text-muted small ms-2">(Visual beacons, SMS dispatch, wearable haptics, synthesized PA voice)</span>
+            </td>
+          </tr>
+          <tr>
+            <th>Personnel Exposed:</th>
+            <td><strong class="text-white">{{ incident.workers_exposed }} Technicians</strong> <span class="text-success small ms-2">&bull; Evacuated successfully via Corridor A Exit</span></td>
+          </tr>
+          <tr>
+            <th>Final Incident Status:</th>
+            <td><span class="badge bg-info text-dark fw-bold">{{ incident.response_status }}</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Root Cause Analysis -->
+    <h5 class="text-white border-bottom border-secondary pb-2 mb-3">2. Root Cause &amp; Forensic Engineering Findings</h5>
+    <div class="p-3 bg-dark bg-opacity-50 rounded border border-secondary border-opacity-25 mb-4">
+      <strong class="text-info d-block mb-1">Identified Mechanical / Electrical Failure Modes:</strong>
+      <p class="text-light small mb-2">{{ incident.root_causes }}</p>
+      <strong class="text-info d-block mb-1">Auditor Field Observations:</strong>
+      <p class="text-muted small mb-0">{{ incident.notes }}</p>
+    </div>
+
+    <!-- Corrective Action Items -->
+    <h5 class="text-white border-bottom border-secondary pb-2 mb-3">3. Mandated Corrective &amp; Preventive Actions (CAPA)</h5>
+    <ul class="text-light small mb-5">
+      <li>Replace isolation valve V-01 secondary packing seal and verify torque specifications.</li>
+      <li>Conduct bench overhaul of primary siren circuit breaker and replace acoustic driver horn.</li>
+      <li>Inspect compressor C-01 drive-end bearings to eliminate 5.8 mm/s vibration excursion.</li>
+      <li>Perform zero-gas and span calibration check on E-Nose sensor array (Channels S1-S5).</li>
+    </ul>
+
+    <!-- Sign-Off Certification Block -->
+    <div class="border-top border-secondary pt-4 mt-5">
+      <div class="row text-center text-muted small g-4">
+        <div class="col-4">
+          <div class="border-bottom border-secondary pb-4 mb-2"></div>
+          <strong class="text-white d-block">Sarah Connor, CSHM</strong>
+          <span>Chief Health &amp; Safety Officer</span>
+        </div>
+        <div class="col-4">
+          <div class="border-bottom border-secondary pb-4 mb-2"></div>
+          <strong class="text-white d-block">David Miller, PE</strong>
+          <span>Lead Reliability Engineer</span>
+        </div>
+        <div class="col-4">
+          <div class="border-bottom border-secondary pb-4 mb-2"></div>
+          <strong class="text-white d-block">Elena Rostova</strong>
+          <span>Plant Operations Director</span>
+        </div>
+      </div>
+      <div class="text-center text-dim small mt-4">
+        GASGUARD X Autonomous Safety Systems &bull; System Generated Cryptographic Audit Record
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="glass-panel p-5 text-center text-muted">
+    <h5>No Incident Selected</h5>
+    <p>Select an incident from the dropdown above to view or export the safety report.</p>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

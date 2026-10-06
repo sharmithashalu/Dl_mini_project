@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}GASGUARD X - Incident Management Database{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-xl-4">
+
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+      <h3 class="text-white fw-bold mb-1"><i class="bi bi-journal-text text-info"></i> Module 13: Industrial Incident Management Database</h3>
+      <p class="text-muted small mb-0">Persistent SQLite audit trail of gas releases, equipment failures, primary alarm heartbeats, and failover dispatches.</p>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('reports_view') }}" class="btn btn-sm btn-info text-dark fw-bold">
+        <i class="bi bi-file-earmark-pdf-fill"></i> View Safety Reports
+      </a>
+    </div>
+  </div>
+
+  <!-- Incident Archive Table -->
+  <div class="glass-panel p-4">
+    <div class="table-responsive">
+      <table class="table table-custom">
+        <thead>
+          <tr>
+            <th>Incident ID</th>
+            <th>Timestamp</th>
+            <th>Gas Signature</th>
+            <th>Zone / Asset</th>
+            <th>Risk Level</th>
+            <th>Primary Siren</th>
+            <th>Backup Grid</th>
+            <th>Personnel Exposed</th>
+            <th>Resolution</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for inc in incidents %}
+          <tr>
+            <td><strong class="text-info">{{ inc.incident_id }}</strong></td>
+            <td class="text-muted small">{{ inc.timestamp }}</td>
+            <td>
+              <span class="text-white fw-bold">{{ inc.gas_type }}</span><br>
+              <small class="text-muted font-monospace">{{ inc.concentration_ppm }} PPM</small>
+            </td>
+            <td>
+              <span class="text-warning">{{ inc.zone }}</span><br>
+              <small class="text-muted">{{ inc.equipment }}</small>
+            </td>
+            <td>
+              <span class="badge bg-{{ 'danger' if inc.risk_level == 'CRITICAL' else ('warning text-dark' if inc.risk_level == 'HIGH' else 'info') }}">
+                {{ inc.risk_level }} ({{ inc.risk_score }}/100)
+              </span>
+            </td>
+            <td>
+              <span class="badge bg-{{ 'danger' if inc.primary_alarm_status == 'FAILED' else 'success' }}">
+                {{ inc.primary_alarm_status }}
+              </span>
+            </td>
+            <td>
+              <span class="badge bg-{{ 'success' if inc.backup_alert_status == 'ACTIVATED' else 'secondary' }}">
+                {{ inc.backup_alert_status }}
+              </span>
+            </td>
+            <td>
+              <span class="text-white font-monospace">{{ inc.workers_exposed }} Workers</span>
+            </td>
+            <td>
+              <span class="badge bg-dark border border-secondary text-info">{{ inc.response_status }}</span>
+            </td>
+            <td>
+              <div class="d-flex gap-1">
+                <a href="{{ url_for('incident_replay_view', incident_id=inc.incident_id) }}" class="btn btn-xs btn-outline-info py-1 px-2" style="font-size: 0.78rem;">
+                  <i class="bi bi-play-circle"></i> Replay
+                </a>
+                <a href="{{ url_for('reports_view', incident_id=inc.incident_id) }}" class="btn btn-xs btn-outline-light py-1 px-2" style="font-size: 0.78rem;">
+                  <i class="bi bi-file-text"></i> Report
+                </a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

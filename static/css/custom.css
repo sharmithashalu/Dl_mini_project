@@ -1,0 +1,452 @@
+/* ==========================================================================
+   GASGUARD X - Industrial AI Gas Safety Design System
+   Modern Industrial Cyber-Safety Dark Aesthetic, Glassmorphism & Neon HUD
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #101726;
+  --bg-card: rgba(18, 26, 43, 0.75);
+  --bg-card-hover: rgba(26, 38, 64, 0.85);
+  --border-glass: rgba(255, 255, 255, 0.08);
+  --border-active: rgba(56, 189, 248, 0.3);
+
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --text-dim: #64748b;
+
+  /* Curated Industrial Hazard Color Palette */
+  --safe-green: #10b981;
+  --safe-glow: rgba(16, 185, 129, 0.25);
+  --warning-yellow: #f59e0b;
+  --warning-glow: rgba(245, 158, 11, 0.25);
+  --high-orange: #f97316;
+  --high-glow: rgba(249, 115, 22, 0.3);
+  --critical-red: #ef4444;
+  --critical-glow: rgba(239, 68, 68, 0.45);
+  --accent-cyan: #06b6d4;
+  --accent-indigo: #6366f1;
+
+  --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-primary);
+  background-image: 
+    radial-gradient(circle at 15% 20%, rgba(6, 182, 212, 0.04) 0%, transparent 40%),
+    radial-gradient(circle at 85% 75%, rgba(99, 102, 241, 0.04) 0%, transparent 40%),
+    radial-gradient(circle at 50% 50%, rgba(15, 23, 42, 0.8) 0%, transparent 100%);
+  color: var(--text-main);
+  min-height: 100vh;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+}
+
+/* Glassmorphism Card Utilities */
+.glass-panel {
+  background: var(--bg-card);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-glass);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.glass-panel:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.glass-header {
+  border-bottom: 1px solid var(--border-glass);
+  padding: 1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Top Navigation Bar */
+.navbar-gasguard {
+  background: rgba(10, 14, 23, 0.85);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border-glass);
+  padding: 0.75rem 1.5rem;
+  position: sticky;
+  top: 0;
+  z-index: 1030;
+}
+
+.brand-badge {
+  background: linear-gradient(135deg, #06b6d4, #6366f1);
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.85rem;
+  letter-spacing: 1.5px;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  display: inline-block;
+  box-shadow: 0 0 15px rgba(6, 182, 212, 0.4);
+}
+
+.brand-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  background: linear-gradient(90deg, #ffffff, #94a3b8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.nav-link-custom {
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 0.92rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  text-decoration: none;
+}
+
+.nav-link-custom:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.nav-link-custom.active {
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+}
+
+/* Role Selector Badge */
+.role-badge-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-glass);
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.35rem 0.75rem;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-decoration: none;
+}
+
+.role-badge-btn.active {
+  background: rgba(6, 182, 212, 0.15);
+  border-color: #06b6d4;
+  color: #06b6d4;
+  box-shadow: 0 0 10px rgba(6, 182, 212, 0.25);
+}
+
+/* Prototype Disclaimer Banner */
+.disclaimer-banner {
+  background: rgba(245, 158, 11, 0.08);
+  border-bottom: 1px solid rgba(245, 158, 11, 0.25);
+  color: #fbbf24;
+  font-size: 0.82rem;
+  padding: 0.45rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+/* Top KPI Stat Cards */
+.stat-card {
+  padding: 1.25rem;
+  border-radius: 12px;
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--card-border-color, #38bdf8);
+}
+
+.stat-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+}
+
+.stat-title {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  margin-bottom: 0.25rem;
+}
+
+.stat-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: #fff;
+  line-height: 1.2;
+}
+
+.stat-sub {
+  font-size: 0.8rem;
+  margin-top: 0.35rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* Risk Level Badges */
+.badge-safe {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.badge-warning {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.badge-orange {
+  background: rgba(249, 115, 22, 0.15);
+  color: #f97316;
+  border: 1px solid rgba(249, 115, 22, 0.35);
+}
+
+.badge-critical {
+  background: rgba(239, 68, 68, 0.18);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  animation: pulseCritical 1.5s infinite;
+}
+
+@keyframes pulseCritical {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+/* Primary Alarm Status Box */
+.alarm-status-box {
+  padding: 1.25rem;
+  border-radius: 12px;
+  border: 1px solid;
+  transition: all 0.3s;
+}
+
+.alarm-box-active {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: #f59e0b;
+  color: #f59e0b;
+}
+
+.alarm-box-failed {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: #ef4444;
+  color: #ef4444;
+  box-shadow: 0 0 25px rgba(239, 68, 68, 0.25);
+  animation: alarmBorderPulse 1s infinite alternate;
+}
+
+@keyframes alarmBorderPulse {
+  0% { border-color: rgba(239, 68, 68, 0.5); }
+  100% { border-color: rgba(239, 68, 68, 1); }
+}
+
+/* Strobe Visual Beacon Overlay (Active on Alarm Failure) */
+.beacon-active-overlay {
+  box-shadow: inset 0 0 50px rgba(239, 68, 68, 0.35);
+  animation: beaconFlash 0.9s infinite alternate ease-in-out;
+}
+
+@keyframes beaconFlash {
+  0% { box-shadow: inset 0 0 20px rgba(239, 68, 68, 0.15); }
+  100% { box-shadow: inset 0 0 80px rgba(239, 68, 68, 0.45); }
+}
+
+/* Interactive Factory SVG Map */
+.factory-map-container {
+  position: relative;
+  width: 100%;
+  background: #070b13;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border-glass);
+}
+
+.zone-polygon {
+  transition: fill 0.4s ease, stroke 0.4s ease, opacity 0.4s ease;
+  cursor: pointer;
+}
+
+.zone-polygon:hover {
+  filter: brightness(1.2);
+}
+
+.sensor-node {
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.sensor-node:hover {
+  transform: scale(1.15);
+}
+
+.worker-node {
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.leak-plume {
+  mix-blend-mode: screen;
+  pointer-events: none;
+  animation: plumeDrift 3s infinite alternate ease-in-out;
+}
+
+@keyframes plumeDrift {
+  0% { transform: scale(0.96) translate(0, 0); opacity: 0.65; }
+  100% { transform: scale(1.05) translate(4px, -3px); opacity: 0.85; }
+}
+
+/* Explainable AI Cards */
+.xai-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-glass);
+  border-left: 4px solid var(--accent-cyan);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  transition: transform 0.2s;
+}
+
+.xai-card:hover {
+  transform: translateX(4px);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.xai-card.critical {
+  border-left-color: var(--critical-red);
+}
+
+.xai-card.warning {
+  border-left-color: var(--warning-yellow);
+}
+
+/* Emergency Demo Banner / Controls */
+.demo-banner {
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.15), rgba(6, 182, 212, 0.15));
+  border: 1px solid rgba(6, 182, 212, 0.3);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+}
+
+.demo-step-badge {
+  font-family: var(--font-mono);
+  background: #06b6d4;
+  color: #000;
+  font-weight: 800;
+  padding: 0.25rem 0.65rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+/* Incident Replay Timeline */
+.timeline-item {
+  position: relative;
+  padding-left: 2.5rem;
+  padding-bottom: 1.5rem;
+  border-left: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.timeline-item:last-child {
+  border-left-color: transparent;
+}
+
+.timeline-dot {
+  position: absolute;
+  left: -8px;
+  top: 0;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent-cyan);
+  box-shadow: 0 0 10px var(--accent-cyan);
+}
+
+.timeline-dot.critical {
+  background: var(--critical-red);
+  box-shadow: 0 0 10px var(--critical-red);
+}
+
+.timeline-dot.warning {
+  background: var(--warning-yellow);
+  box-shadow: 0 0 10px var(--warning-yellow);
+}
+
+/* Custom Table Styles */
+.table-custom {
+  color: var(--text-main);
+  margin-bottom: 0;
+}
+
+.table-custom th {
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border-glass);
+  padding: 0.85rem 1rem;
+}
+
+.table-custom td {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  padding: 0.85rem 1rem;
+  vertical-align: middle;
+  font-size: 0.9rem;
+}
+
+.table-custom tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* Print Styling for Incident Reports */
+@media print {
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+  .navbar-gasguard, .disclaimer-banner, .btn, .no-print {
+    display: none !important;
+  }
+  .glass-panel {
+    background: #fff !important;
+    color: #000 !important;
+    border: 1px solid #ccc !important;
+    box-shadow: none !important;
+  }
+  .stat-value {
+    color: #000 !important;
+  }
+}

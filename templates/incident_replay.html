@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+
+{% block title %}GASGUARD X - Incident Replay Studio ({{ incident.incident_id }}){% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-xl-4">
+
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+      <h3 class="text-white fw-bold mb-1"><i class="bi bi-clock-history text-info"></i> Module 14: Incident Replay Studio</h3>
+      <p class="text-muted small mb-0">Step-by-step forensic recreation of sequence of events for incident: <strong>{{ incident.incident_id }}</strong></p>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('incidents_view') }}" class="btn btn-sm btn-outline-secondary">&larr; Back to Incidents</a>
+      <a href="{{ url_for('reports_view', incident_id=incident.incident_id) }}" class="btn btn-sm btn-info text-dark fw-bold">
+        <i class="bi bi-file-earmark-pdf-fill"></i> View Safety Report
+      </a>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <!-- Replay Player Timeline Steps -->
+    <div class="col-12 col-lg-7">
+      <div class="glass-panel p-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="text-white mb-0"><i class="bi bi-play-circle-fill text-danger"></i> Chronological Timeline Recreation</h5>
+          <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-info" id="prevReplayBtn"><i class="bi bi-skip-backward-fill"></i></button>
+            <button class="btn btn-sm btn-info text-dark fw-bold" id="playReplayBtn"><i class="bi bi-play-fill"></i> Auto Play</button>
+            <button class="btn btn-sm btn-outline-info" id="nextReplayBtn"><i class="bi bi-skip-forward-fill"></i></button>
+          </div>
+        </div>
+
+        <div class="timeline-container ps-2 mt-4" id="timelineList">
+          <!-- Step 1 -->
+          <div class="timeline-item" data-step="1">
+            <div class="timeline-dot"></div>
+            <div class="text-info fw-bold small">08:00:00 &bull; Baseline Operations</div>
+            <h6 class="text-white mb-1">Nominal Plant Baseline</h6>
+            <p class="text-muted small mb-0">Sensor array S1-S5 reading clean ambient air (&lt; 5 PPM). Valve V-01 pressure steady at 5.1 bar.</p>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="timeline-item" data-step="2">
+            <div class="timeline-dot warning"></div>
+            <div class="text-warning fw-bold small">08:04:15 &bull; Equipment Degradation</div>
+            <h6 class="text-white mb-1">Valve V-01 Micro-Vibration &amp; Thermal Drift</h6>
+            <p class="text-muted small mb-0">Compressor C-01 shaft vibration elevated to 4.8 mm/s. Valve V-01 packing seal integrity deteriorates.</p>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="timeline-item" data-step="3">
+            <div class="timeline-dot warning"></div>
+            <div class="text-warning fw-bold small">08:07:30 &bull; Trace Gas Detection</div>
+            <h6 class="text-white mb-1">Gas Concentration Rising</h6>
+            <p class="text-muted small mb-0">E-Nose sensor S1 detects ammonia plume beginning to diffuse into Zone B (35 PPM).</p>
+          </div>
+
+          <!-- Step 4 -->
+          <div class="timeline-item" data-step="4">
+            <div class="timeline-dot critical"></div>
+            <div class="text-danger fw-bold small">08:09:40 &bull; Risk Engine Threshold Trip</div>
+            <h6 class="text-white mb-1">Pre-Leak Risk Reaches HIGH (76/100)</h6>
+            <p class="text-muted small mb-0">ML Risk Classifier projects escalating containment rupture. Workers in Zone B flagged.</p>
+          </div>
+
+          <!-- Step 5 -->
+          <div class="timeline-item" data-step="5">
+            <div class="timeline-dot critical"></div>
+            <div class="text-danger fw-bold small">08:11:00 &bull; Primary Alarm Activated</div>
+            <h6 class="text-white mb-1">Zone B Audible Horn Triggered</h6>
+            <p class="text-muted small mb-0">Primary siren command sent. 15-second SCADA acknowledgment countdown begins.</p>
+          </div>
+
+          <!-- Step 6 -->
+          <div class="timeline-item" data-step="6">
+            <div class="timeline-dot critical"></div>
+            <div class="text-danger fw-bold small">08:11:18 &bull; Key Innovation: Alarm Failure Detected</div>
+            <h6 class="text-white mb-1">Primary Siren Circuit FAILED</h6>
+            <p class="text-muted small mb-0">Zero acknowledgment received; siren circuit breaker open. System flags primary alarm as DEAD.</p>
+          </div>
+
+          <!-- Step 7 -->
+          <div class="timeline-item" data-step="7">
+            <div class="timeline-dot"></div>
+            <div class="text-success fw-bold small">08:11:20 &bull; Multi-Layer Failover Engaged</div>
+            <h6 class="text-white mb-1">5 Redundant Backup Systems Autonomous Trigger</h6>
+            <p class="text-muted small mb-0">Visual xenon strobes flash, mobile SMS dispatched to manager, LoRa haptic wristbands alert W001 &amp; W002, PA synthesized voice broadcasts evacuation.</p>
+          </div>
+
+          <!-- Step 8 -->
+          <div class="timeline-item" data-step="8">
+            <div class="timeline-dot"></div>
+            <div class="text-info fw-bold small">08:14:00 &bull; Resolution</div>
+            <h6 class="text-white mb-1">Emergency Isolation Valve Tripped &amp; Evacuation Complete</h6>
+            <p class="text-muted small mb-0">Automated booster ventilation cleared toxic vapors. All personnel mustered safely.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Forensic Incident Snapshot Card -->
+    <div class="col-12 col-lg-5">
+      <div class="glass-panel p-4 h-100">
+        <h5 class="text-white mb-3"><i class="bi bi-file-earmark-medical-fill text-warning"></i> Incident Telemetry Snapshot</h5>
+
+        <div class="p-3 bg-dark rounded border border-secondary border-opacity-25 mb-3">
+          <div class="row g-2">
+            <div class="col-6">
+              <small class="text-muted">Incident Identifier</small>
+              <div class="fs-5 fw-bold text-info">{{ incident.incident_id }}</div>
+            </div>
+            <div class="col-6">
+              <small class="text-muted">Timestamp</small>
+              <div class="text-white">{{ incident.timestamp }}</div>
+            </div>
+            <div class="col-6">
+              <small class="text-muted">Chemical Compound</small>
+              <div class="text-warning fw-bold">{{ incident.gas_type }}</div>
+            </div>
+            <div class="col-6">
+              <small class="text-muted">Peak Concentration</small>
+              <div class="text-danger fw-bold font-monospace">{{ incident.concentration_ppm }} PPM</div>
+            </div>
+            <div class="col-6">
+              <small class="text-muted">Location Zone</small>
+              <div class="text-white">{{ incident.zone }}</div>
+            </div>
+            <div class="col-6">
+              <small class="text-muted">Originating Equipment</small>
+              <div class="text-white">{{ incident.equipment }}</div>
+            </div>
+            <div class="col-6">
+              <small class="text-muted">Primary Alarm State</small>
+              <div class="text-danger fw-bold">{{ incident.primary_alarm_status }}</div>
+            </div>
+            <div class="col-6">
+              <small class="text-muted">Backup Failover</small>
+              <div class="text-success fw-bold">{{ incident.backup_alert_status }}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <small class="text-muted text-uppercase fw-bold">Root Cause Investigation Findings</small>
+          <div class="p-2 bg-dark rounded border border-secondary border-opacity-25 text-light small mt-1">
+            {{ incident.root_causes }}
+          </div>
+        </div>
+
+        <div>
+          <small class="text-muted text-uppercase fw-bold">Auditor Forensic Notes</small>
+          <div class="p-2 bg-dark rounded border border-secondary border-opacity-25 text-muted small mt-1">
+            {{ incident.notes }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  let activeStep = 1;
+  const totalSteps = 8;
+  let playInterval = null;
+
+  function highlightStep(step) {
+    document.querySelectorAll('.timeline-item').forEach(item => {
+      const s = parseInt(item.getAttribute('data-step'));
+      if (s === step) {
+        item.style.opacity = '1';
+        item.style.transform = 'translateX(6px)';
+        item.querySelector('.timeline-dot').style.transform = 'scale(1.4)';
+      } else if (s < step) {
+        item.style.opacity = '0.6';
+        item.style.transform = 'none';
+        item.querySelector('.timeline-dot').style.transform = 'none';
+      } else {
+        item.style.opacity = '0.3';
+        item.style.transform = 'none';
+        item.querySelector('.timeline-dot').style.transform = 'none';
+      }
+    });
+  }
+
+  document.getElementById('nextReplayBtn').addEventListener('click', () => {
+    activeStep = (activeStep < totalSteps) ? activeStep + 1 : 1;
+    highlightStep(activeStep);
+  });
+
+  document.getElementById('prevReplayBtn').addEventListener('click', () => {
+    activeStep = (activeStep > 1) ? activeStep - 1 : totalSteps;
+    highlightStep(activeStep);
+  });
+
+  document.getElementById('playReplayBtn').addEventListener('click', () => {
+    if (playInterval) {
+      clearInterval(playInterval);
+      playInterval = null;
+      document.getElementById('playReplayBtn').innerHTML = '<i class="bi bi-play-fill"></i> Auto Play';
+    } else {
+      document.getElementById('playReplayBtn').innerHTML = '<i class="bi bi-pause-fill"></i> Pause';
+      playInterval = setInterval(() => {
+        activeStep = (activeStep < totalSteps) ? activeStep + 1 : 1;
+        highlightStep(activeStep);
+      }, 2500);
+    }
+  });
+
+  highlightStep(1);
+</script>
+{% endblock %}

@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block title %}GASGUARD X - Multi-Layer Redundant Alert System{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-xl-4">
+
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+      <h3 class="text-white fw-bold mb-1"><i class="bi bi-bell-fill text-danger"></i> Module 8 &amp; 9: Primary Alarm Failure &amp; Multi-Layer Backup Alert</h3>
+      <p class="text-muted small mb-0">Autonomous failover architecture: when the primary audible horn fails to acknowledge, 5 redundant channels activate.</p>
+    </div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-sm btn-success" id="ackAlarmBtnPage" onclick="window.gasguardClient.acknowledgeAlarm()">
+        <i class="bi bi-check-circle"></i> Acknowledge Alarm
+      </button>
+      <button class="btn btn-sm btn-danger" id="simAlarmFailBtnPage" onclick="window.gasguardClient.simulateAlarmFailure()">
+        <i class="bi bi-x-octagon"></i> Simulate Primary Alarm Failure
+      </button>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <!-- Primary Alarm Card (Module 8 Key Innovation) -->
+    <div class="col-12 col-lg-5">
+      <div class="glass-panel p-4 h-100 border-{{ 'danger' if state.alerts.primary_alarm.is_failed else ('warning' if state.alerts.primary_alarm.is_active else 'secondary') }}">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="text-white mb-0"><i class="bi bi-megaphone-fill text-warning"></i> Primary Audible Siren</h5>
+          <span class="badge bg-{{ state.alerts.primary_alarm.badge_class }} fs-6">{{ state.alerts.primary_alarm.status }}</span>
+        </div>
+
+        <div class="p-3 bg-dark bg-opacity-60 rounded border border-secondary border-opacity-25 text-center mb-3">
+          <small class="text-muted text-uppercase fw-bold">Primary Alarm Circuit State</small>
+          <div class="display-6 fw-bold my-2 {{ 'text-danger' if state.alerts.primary_alarm.is_failed else ('text-warning' if state.alerts.primary_alarm.is_active else 'text-success') }}">
+            {{ '❌ FAILED / DEAD HEARTBEAT' if state.alerts.primary_alarm.is_failed else ('🔔 ' + state.alerts.primary_alarm.status) }}
+          </div>
+          <p class="text-muted small mb-0">
+            {% if state.alerts.primary_alarm.is_failed %}
+            Primary siren circuit experienced breaker trip or 15s operator timeout with zero acknowledgment.
+            {% elif state.alerts.primary_alarm.is_active %}
+            Audible alarm active in Zone B. Awaiting operator acknowledgment within 15-second grace window.
+            {% else %}
+            Audible horn in standby monitoring mode. Circuit impedance nominal.
+            {% endif %}
+          </p>
+        </div>
+
+        <div class="alert alert-dark border-secondary small mb-0">
+          <strong><i class="bi bi-info-circle text-info"></i> Innovation Note:</strong><br>
+          In traditional industrial disasters (e.g. Bhopal, Texas City), reliance on a single auditory horn resulted in casualties when the horn failed or was disabled. GASGUARD X detects unacknowledged sirens and instantly triggers redundant layers.
+        </div>
+      </div>
+    </div>
+
+    <!-- Multi-Layer Backup System (Module 9) -->
+    <div class="col-12 col-lg-7">
+      <div class="glass-panel p-4 h-100 border-{{ 'danger' if state.alerts.backup_alerts.is_activated else 'secondary' }}">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="text-white mb-0"><i class="bi bi-shield-shaded text-info"></i> Autonomous 5-Layer Backup Grid</h5>
+          <span class="badge bg-{{ state.alerts.backup_alerts.badge_class }} fs-6">{{ state.alerts.backup_alerts.overall_status }}</span>
+        </div>
+
+        <div class="row g-2">
+          {% for key, sys in state.alerts.backup_alerts.systems.items() %}
+          <div class="col-12">
+            <div class="p-3 rounded bg-dark bg-opacity-50 border border-secondary border-opacity-25 d-flex justify-content-between align-items-center flex-wrap gap-2">
+              <div class="d-flex align-items-center gap-3">
+                <div class="stat-icon bg-{{ 'danger' if sys.status == 'ACTIVE' else 'dark' }} text-white fs-4">
+                  <i class="bi bi-{{ 'lightning-charge-fill' if sys.type == 'Visual' else ('chat-dots-fill' if sys.type == 'Cellular' else ('display-fill' if sys.type == 'SCADA' else ('smartwatch' if sys.type == 'IoT BLE/LoRa' else 'soundwave'))) }}"></i>
+                </div>
+                <div>
+                  <h6 class="text-white mb-0">{{ sys.name }}</h6>
+                  <small class="text-muted">{{ sys.details }}</small>
+                </div>
+              </div>
+              <span class="badge bg-{{ 'danger' if sys.status == 'ACTIVE' else 'secondary' }} fs-6 px-3 py-2">{{ sys.status }}</span>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ESP32 / IoT Hardware Integration Architecture -->
+  <div class="glass-panel p-4">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+      <div>
+        <h5 class="text-white mb-1"><i class="bi bi-hdd-network-fill text-info"></i> ESP32 Microcontroller &amp; Hardware Bridge Integration</h5>
+        <p class="text-muted small mb-0">Direct machine-to-machine JSON polling endpoint for physical relays, audible horns, and LoRa transmitters.</p>
+      </div>
+      <a href="/api/iot/status" target="_blank" class="btn btn-sm btn-outline-info">
+        <i class="bi bi-box-arrow-up-right"></i> Open /api/iot/status API
+      </a>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-12 col-lg-6">
+        <div class="p-3 bg-dark rounded border border-secondary border-opacity-25">
+          <small class="text-muted text-uppercase fw-bold mb-2 d-block">Live ESP32 JSON Payload Preview</small>
+          <pre class="font-monospace text-info small mb-0" style="max-height: 200px; overflow-y: auto;">
+{
+  "device_target": "ESP32_GATEWAY_V1",
+  "timestamp": "{{ state.timestamp }}",
+  "primary_buzzer_relay": {{ 1 if state.alerts.primary_alarm.status == 'ACTIVE' else 0 }},
+  "backup_strobe_relay": {{ 1 if state.alerts.backup_alerts.is_activated else 0 }},
+  "backup_wearable_lora_trigger": {{ 1 if state.alerts.backup_alerts.is_activated else 0 }},
+  "risk_level": "{{ state.risk.risk_level }}",
+  "risk_score": {{ state.risk.risk_score }},
+  "leak_zone": "{{ state.localization.probable_zone }}",
+  "gas_type": "{{ state.gas.gas_type }}",
+  "concentration_ppm": {{ state.gas.concentration_ppm }}
+}
+          </pre>
+        </div>
+      </div>
+
+      <div class="col-12 col-lg-6">
+        <div class="p-3 bg-dark rounded border border-secondary border-opacity-25 h-100">
+          <small class="text-muted text-uppercase fw-bold mb-2 d-block">Physical Wiring &amp; Pinout Reference</small>
+          <ul class="text-light small mb-0">
+            <li><strong>GPIO 18:</strong> Solid-state relay controlling Primary 110dB Piezo Siren.</li>
+            <li><strong>GPIO 19:</strong> Solid-state relay driving High-Intensity Red Xenon Strobe Beacon.</li>
+            <li><strong>GPIO 21:</strong> SX1278 LoRa 433MHz transceiver module for worker wearable wristband alerts.</li>
+            <li><strong>GPIO 22 / 23:</strong> I2C bus for local OLED diagnostic telemetry display.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

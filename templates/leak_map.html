@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block title %}GASGUARD X - Dynamic Factory Risk Map & Leak Localization{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-xl-4">
+
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+      <h3 class="text-white fw-bold mb-1"><i class="bi bi-geo-alt-fill text-warning"></i> Module 5 &amp; 7: Dynamic Factory Risk Map &amp; Leak Localization</h3>
+      <p class="text-muted small mb-0">Multi-sensor spatial triangulation with atmospheric airflow vector drift compensation.</p>
+    </div>
+    <div class="d-flex gap-2">
+      <span class="badge bg-danger fs-6 p-2">Probable Leak Zone: {{ state.localization.probable_zone }}</span>
+      <span class="badge bg-warning text-dark fs-6 p-2">{{ state.localization.confidence }}% Confidence</span>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <!-- Main Interactive Map Canvas -->
+    <div class="col-12 col-xl-8">
+      <div class="glass-panel p-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-white fw-bold small"><i class="bi bi-compass text-info"></i> Plant Floor Plan &bull; Spatial Gas Diffusion Grid</span>
+          <span class="text-muted small">Airflow: {{ state.localization.airflow.direction }} @ {{ state.localization.airflow.speed }} m/s</span>
+        </div>
+
+        <div class="factory-map-container" style="min-height: 480px;">
+          <svg id="factoryMapSvg" viewBox="0 0 600 450" class="w-100 h-100" style="display: block;">
+            <defs>
+              <radialGradient id="plumeCriticalGrad" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#ef4444" stop-opacity="0.85" />
+                <stop offset="50%" stop-color="#f97316" stop-opacity="0.45" />
+                <stop offset="100%" stop-color="#ef4444" stop-opacity="0.0" />
+              </radialGradient>
+              <radialGradient id="plumeHighGrad" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#f97316" stop-opacity="0.75" />
+                <stop offset="60%" stop-color="#f59e0b" stop-opacity="0.35" />
+                <stop offset="100%" stop-color="#f97316" stop-opacity="0.0" />
+              </radialGradient>
+              <radialGradient id="plumeWarnGrad" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.65" />
+                <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.0" />
+              </radialGradient>
+            </defs>
+
+            <!-- ZONE A -->
+            <polygon id="polyZoneA" points="20,20 280,20 280,220 20,220" class="zone-polygon" fill="rgba(18, 26, 43, 0.45)" stroke="rgba(255, 255, 255, 0.1)" />
+            <text x="35" y="45" fill="#94a3b8" font-size="13" font-weight="700">ZONE A: RAW GAS STORAGE &amp; TANK FARM</text>
+
+            <!-- ZONE B -->
+            <polygon id="polyZoneB" points="300,20 580,20 580,220 300,220" class="zone-polygon" fill="rgba(239, 68, 68, 0.25)" stroke="#ef4444" stroke-width="2.5" />
+            <text x="315" y="45" fill="#f87171" font-size="13" font-weight="700">ZONE B: COMPRESSOR BAY &amp; VALVE MANIFOLD</text>
+
+            <!-- ZONE C -->
+            <polygon id="polyZoneC" points="20,240 330,240 330,430 20,430" class="zone-polygon" fill="rgba(18, 26, 43, 0.45)" stroke="rgba(255, 255, 255, 0.1)" />
+            <text x="35" y="265" fill="#94a3b8" font-size="13" font-weight="700">ZONE C: MAIN PROCESS PIPELINE CORRIDOR</text>
+
+            <!-- ZONE D -->
+            <polygon id="polyZoneD" points="350,240 580,240 580,430 350,430" class="zone-polygon" fill="rgba(18, 26, 43, 0.45)" stroke="rgba(255, 255, 255, 0.1)" />
+            <text x="365" y="265" fill="#94a3b8" font-size="13" font-weight="700">ZONE D: VENTING &amp; HIGH-PRESSURE PUMPS</text>
+
+            <!-- Dynamic Gas Plume Diffusion -->
+            <circle id="gasPlumeElement" cx="450" cy="120" r="85" fill="url(#plumeCriticalGrad)" class="leak-plume" />
+
+            <!-- Equipment Nodes -->
+            <g id="equip_V01" transform="translate(490, 160)">
+              <rect x="-14" y="-14" width="28" height="28" rx="6" fill="#1e293b" stroke="#ef4444" stroke-width="2" id="equipIcon_V-01" />
+              <text x="0" y="4" fill="#fff" font-size="9" font-weight="bold" text-anchor="middle">V-01</text>
+            </g>
+            <g id="equip_P02" transform="translate(190, 100)">
+              <rect x="-14" y="-14" width="28" height="28" rx="6" fill="#1e293b" stroke="#38bdf8" stroke-width="2" id="equipIcon_P-02" />
+              <text x="0" y="4" fill="#fff" font-size="9" font-weight="bold" text-anchor="middle">P-02</text>
+            </g>
+            <g id="equip_C01" transform="translate(260, 320)">
+              <rect x="-14" y="-14" width="28" height="28" rx="6" fill="#1e293b" stroke="#f59e0b" stroke-width="2" id="equipIcon_C-01" />
+              <text x="0" y="4" fill="#fff" font-size="9" font-weight="bold" text-anchor="middle">C-01</text>
+            </g>
+            <g id="equip_P04" transform="translate(460, 330)">
+              <rect x="-14" y="-14" width="28" height="28" rx="6" fill="#1e293b" stroke="#10b981" stroke-width="2" id="equipIcon_P-04" />
+              <text x="0" y="4" fill="#fff" font-size="9" font-weight="bold" text-anchor="middle">P-04</text>
+            </g>
+
+            <!-- Sensors S1-S5 -->
+            <g class="sensor-node" transform="translate(150, 120)">
+              <circle id="sensorNode_S1" r="10" fill="#06b6d4" stroke="#fff" stroke-width="2" />
+              <text id="sensorVal_S1" x="14" y="4" fill="#38bdf8" font-size="10" font-weight="bold">S1: {{ state.sensors.raw_inputs.S1 }}</text>
+            </g>
+            <g class="sensor-node" transform="translate(450, 120)">
+              <circle id="sensorNode_S2" r="12" fill="#ef4444" stroke="#fff" stroke-width="2" />
+              <text id="sensorVal_S2" x="16" y="4" fill="#f87171" font-size="10" font-weight="bold">S2: {{ state.sensors.raw_inputs.S2 }}</text>
+            </g>
+            <g class="sensor-node" transform="translate(510, 190)">
+              <circle id="sensorNode_S3" r="10" fill="#f59e0b" stroke="#fff" stroke-width="2" />
+              <text id="sensorVal_S3" x="-50" y="4" fill="#fbbf24" font-size="10" font-weight="bold">S3: {{ state.sensors.raw_inputs.S3 }}</text>
+            </g>
+            <g class="sensor-node" transform="translate(180, 330)">
+              <circle id="sensorNode_S4" r="10" fill="#06b6d4" stroke="#fff" stroke-width="2" />
+              <text id="sensorVal_S4" x="14" y="4" fill="#38bdf8" font-size="10" font-weight="bold">S4: {{ state.sensors.raw_inputs.S4 }}</text>
+            </g>
+            <g class="sensor-node" transform="translate(460, 330)">
+              <circle id="sensorNode_S5" r="10" fill="#06b6d4" stroke="#fff" stroke-width="2" />
+              <text id="sensorVal_S5" x="14" y="4" fill="#38bdf8" font-size="10" font-weight="bold">S5: {{ state.sensors.raw_inputs.S5 }}</text>
+            </g>
+
+            <!-- Workers W001-W004 -->
+            <g id="workerPin_W001" class="worker-node" transform="translate(420, 140)">
+              <circle r="7" fill="#ef4444" stroke="#fff" stroke-width="1.5" />
+              <text x="9" y="3" fill="#fff" font-size="9" font-weight="bold">W001 (Op)</text>
+            </g>
+            <g id="workerPin_W002" class="worker-node" transform="translate(480, 160)">
+              <circle r="7" fill="#ef4444" stroke="#fff" stroke-width="1.5" />
+              <text x="9" y="3" fill="#fff" font-size="9" font-weight="bold">W002 (Tech)</text>
+            </g>
+            <g id="workerPin_W003" class="worker-node" transform="translate(130, 150)">
+              <circle r="7" fill="#10b981" stroke="#fff" stroke-width="1.5" />
+              <text x="9" y="3" fill="#fff" font-size="9" font-weight="bold">W003</text>
+            </g>
+            <g id="workerPin_W004" class="worker-node" transform="translate(210, 340)">
+              <circle r="7" fill="#f59e0b" stroke="#fff" stroke-width="1.5" />
+              <text x="9" y="3" fill="#fff" font-size="9" font-weight="bold">W004</text>
+            </g>
+
+            <!-- Airflow Vector -->
+            <g transform="translate(540, 50)">
+              <circle r="18" fill="rgba(15, 23, 42, 0.85)" stroke="rgba(255, 255, 255, 0.2)" />
+              <line x1="0" y1="8" x2="0" y2="-12" stroke="#06b6d4" stroke-width="2" />
+              <text x="0" y="-14" fill="#06b6d4" font-size="8" font-weight="bold" text-anchor="middle">NE</text>
+              <text x="0" y="27" fill="#64748b" font-size="7" text-anchor="middle">2.5 m/s</text>
+            </g>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Side: Localization Analytics & Airflow Controls -->
+    <div class="col-12 col-xl-4">
+      <!-- Zone Probability Ranking -->
+      <div class="glass-panel p-3 mb-3">
+        <h5 class="text-white mb-3"><i class="bi bi-pie-chart text-info"></i> Zone Localization Probabilities</h5>
+        <div class="d-flex flex-column gap-2">
+          {% for zone, prob in state.localization.zone_probabilities.items() %}
+          <div>
+            <div class="d-flex justify-content-between text-light small mb-1">
+              <span><strong>{{ zone }}</strong></span>
+              <span class="text-{{ 'danger fw-bold' if prob > 50 else 'muted' }}">{{ prob }}%</span>
+            </div>
+            <div class="progress bg-dark" style="height: 8px;">
+              <div class="progress-bar bg-{{ 'danger' if prob > 50 else ('warning' if prob > 25 else 'info') }}" style="width: {{ prob }}%;"></div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Airflow & Dispersion Vectors -->
+      <div class="glass-panel p-3 mb-3">
+        <h5 class="text-white mb-2"><i class="bi bi-wind text-info"></i> Atmospheric Airflow Drift</h5>
+        <p class="text-muted small">Plumes disperse downwind from leak origins. The algorithm compensates using inverted vector tracking.</p>
+        <div class="row g-2 mb-2">
+          <div class="col-6">
+            <div class="p-2 bg-dark rounded border border-secondary border-opacity-25 text-center">
+              <small class="text-muted">Prevailing Vector</small>
+              <div class="fs-4 fw-bold text-info">{{ state.localization.airflow.direction }} (45°)</div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="p-2 bg-dark rounded border border-secondary border-opacity-25 text-center">
+              <small class="text-muted">Wind Velocity</small>
+              <div class="fs-4 fw-bold text-white">{{ state.localization.airflow.speed }} m/s</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Disclaimer Box -->
+      <div class="glass-panel p-3 border-secondary">
+        <h6 class="text-white small fw-bold mb-1"><i class="bi bi-shield-exclamation text-warning"></i> Localization Disclaimer</h6>
+        <p class="text-muted small mb-0">
+          This system performs <strong>zone-level spatial estimation</strong> using virtual sensor arrays. It does NOT claim exact microscopic pipe-crack localization.
+        </p>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

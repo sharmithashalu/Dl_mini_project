@@ -1,0 +1,3095 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GASGUARD X – AI-Based Multi-Layer Industrial Gas Safety & Leakage Localization System</title>
+  <meta name="description" content="GASGUARD X is an AI-powered industrial safety intelligence platform that predicts gas-leak risks, identifies probable leak zones, monitors equipment and sensor reliability, verifies safety-system failures, predicts worker exposure, and provides multi-layer emergency response.">
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            cyber: {
+              950: '#060913',
+              900: '#0a0f1d',
+              850: '#0e1529',
+              800: '#141d36',
+              700: '#1e2b4f',
+              600: '#2a3b6c',
+            },
+            gas: {
+              safe: '#10b981',
+              warning: '#f59e0b',
+              high: '#f97316',
+              critical: '#ef4444',
+              cyan: '#06b6d4',
+              indigo: '#6366f1',
+            }
+          },
+          animation: {
+            'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'beacon': 'beacon 1.5s ease-in-out infinite',
+            'ripple': 'ripple 2s linear infinite',
+          },
+          keyframes: {
+            beacon: {
+              '0%, 100%': { opacity: 1, transform: 'scale(1)' },
+              '50%': { opacity: 0.3, transform: 'scale(1.15)' },
+            },
+            ripple: {
+              '0%': { transform: 'scale(0.8)', opacity: 0.9 },
+              '100%': { transform: 'scale(2.2)', opacity: 0 },
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- React 18, ReactDOM, and Babel Standalone -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Chart.js for Industrial Diagnostics -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    /* Custom Industrial SCADA Dark Aesthetics */
+    body {
+      background-color: #060913;
+      color: #e2e8f0;
+      font-family: 'Inter', sans-serif;
+      overflow-x: hidden;
+    }
+    
+    /* Subtle SCADA Grid Background */
+    .scada-grid {
+      background-size: 32px 32px;
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    }
+
+    /* Custom Glass Panel */
+    .glass-card {
+      background: rgba(14, 21, 41, 0.82);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+    }
+    .glass-card:hover {
+      border-color: rgba(255, 255, 255, 0.14);
+    }
+
+    /* Glow utilities */
+    .glow-cyan {
+      box-shadow: 0 0 15px rgba(6, 182, 212, 0.25);
+    }
+    .glow-red {
+      box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
+    }
+    .glow-amber {
+      box-shadow: 0 0 15px rgba(245, 158, 11, 0.3);
+    }
+
+    /* Custom scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0a0f1d;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1e2b4f;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #2a3b6c;
+    }
+
+    /* Animated Gas Plume */
+    @keyframes plumePulse {
+      0% { r: 60px; opacity: 0.8; }
+      50% { r: 90px; opacity: 0.4; }
+      100% { r: 60px; opacity: 0.8; }
+    }
+    .animate-plume {
+      animation: plumePulse 3s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body class="scada-grid min-h-screen">
+  <div id="root"></div>
+
+  <!-- React Application Logic -->
+  <script type="text/babel">
+    const { useState, useEffect, useReducer, useRef, useMemo, useCallback } = React;
+
+    // ==========================================
+    // AUDIO & SPEECH SYNTHESIS ENGINE
+    // ==========================================
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.speechEnabled = true;
+        this.audioEnabled = true;
+      }
+      init() {
+        if (!this.ctx && (window.AudioContext || window.webkitAudioContext)) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioContext();
+        }
+      }
+      playTone(freq, type = 'sine', duration = 0.2, vol = 0.15) {
+        if (!this.audioEnabled) return;
+        try {
+          this.init();
+          if (!this.ctx) return;
+          if (this.ctx.state === 'suspended') this.ctx.resume();
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+          gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + duration);
+        } catch (e) {
+          console.warn('Audio tone err:', e);
+        }
+      }
+      playAlarmSiren() {
+        if (!this.audioEnabled) return;
+        try {
+          this.init();
+          if (!this.ctx) return;
+          if (this.ctx.state === 'suspended') this.ctx.resume();
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(440, now);
+          osc.frequency.linearRampToValueAtTime(880, now + 0.35);
+          osc.frequency.linearRampToValueAtTime(440, now + 0.7);
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.7);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.7);
+        } catch (e) {
+          console.warn('Alarm audio err:', e);
+        }
+      }
+      playClick() {
+        this.playTone(800, 'triangle', 0.05, 0.08);
+      }
+      playWarningBeep() {
+        this.playTone(520, 'square', 0.18, 0.15);
+      }
+      speak(text) {
+        if (!this.speechEnabled || !('speechSynthesis' in window)) return;
+        try {
+          window.speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.rate = 1.05;
+          utterance.pitch = 0.95;
+          utterance.volume = 0.9;
+          window.speechSynthesis.speak(utterance);
+        } catch (e) {
+          console.warn('Speech synthesis err:', e);
+        }
+      }
+    }
+    const sound = new SoundEngine();
+
+    // ==========================================
+    // INITIAL SYSTEM SIMULATED STATE
+    // ==========================================
+    const INITIAL_STATE = {
+      // Core Telemetry
+      gasType: 'Ammonia (NH₃)',
+      gasFormula: 'NH₃',
+      gasConcentration: 28.4, // PPM
+      gasBaseline: 15.0,
+      temperature: 24.2, // °C
+      pressure: 2.15, // bar
+      flowRate: 124.0, // m³/h
+      vibration: 1.4, // mm/s
+      vibrationBaseline: 1.2,
+      
+      // E-Nose 5 Virtual Sensor Array (Ohms / normalized response index)
+      sensors: [
+        { id: 1, code: 'S-01', name: 'MOS Metal Oxide (Amines/NH₃)', reading: 118, baseline: 115, trust: 96, status: 'Normal', desc: 'High sensitivity to Ammonia & nitrogenous vapors' },
+        { id: 2, code: 'S-02', name: 'Catalytic Bead (Combustibles)', reading: 104, baseline: 102, trust: 94, status: 'Normal', desc: 'Oxidation combustion sensor for flammable hydrocarbons' },
+        { id: 3, code: 'S-03', name: 'Electrochemical (Toxic Gases)', reading: 96, baseline: 95, trust: 98, status: 'Normal', desc: 'Direct red-ox galvanic cell for rapid toxic response' },
+        { id: 4, code: 'S-04', name: 'Photo-Ionization PID (VOCs)', reading: 102, baseline: 100, trust: 92, status: 'Normal', desc: 'UV ionization detector for volatile organic compounds' },
+        { id: 5, code: 'S-05', name: 'Solid-State Metal Oxide (CO/Inorg)', reading: 122, baseline: 120, trust: 95, status: 'Normal', desc: 'Semiconductor thin-film sensor for inorganic hydrides' },
+      ],
+      sensorFaultSimulated: false, // When true, Sensor 4 drifts to 42% trust
+      
+      // Equipment Health
+      equipment: [
+        { id: 'V-101', name: 'Pneumatic Isolation Valve', type: 'Valve', zone: 'Zone B', health: 64, status: 'Attention Required', abnormality: 'Abnormal vibration trend (4.8 mm/s) & micro-chatter', rec: 'Schedule actuator packing overhaul within 48h; inspect gland seal', isFailed: false },
+        { id: 'P-204', name: 'High-Pressure Corridor Pipeline', type: 'Pipeline', zone: 'Zone C', health: 91, status: 'Nominal', abnormality: 'None detected (stable acoustic baseline)', rec: 'Routine ultrasonic wall thickness scan scheduled in 45 days', isFailed: false },
+        { id: 'C-302', name: 'Centrifugal Gas Compressor', type: 'Compressor', zone: 'Zone B', health: 78, status: 'Monitored', abnormality: 'Bearing temperature +5°C above standard nominal', rec: 'Verify lubricant circulation rate; balance rotor harmonics', isFailed: false },
+        { id: 'HEX-105', name: 'Glycol Chiller Cooling System', type: 'Cooling System', zone: 'Zone A', health: 85, status: 'Nominal', abnormality: 'Nominal thermal delta (14.2°C)', rec: 'Bi-monthly coolant descaling cycle', isFailed: false },
+        { id: 'TK-401', name: 'Cryogenic Gas Storage Vessel', type: 'Storage Unit', zone: 'Zone A', health: 94, status: 'Nominal', abnormality: 'Zero pressure containment variance', rec: 'Annual relief valve hydrostatic recertification', isFailed: false },
+      ],
+
+      // Localization & Factory Zones
+      zones: {
+        'Zone A': { name: 'Tank Storage & Raw Feed', riskLevel: 'Normal', gasPpm: 12.0, temp: 21.0, workers: 4, color: '#10b981' },
+        'Zone B': { name: 'Compressor & Valve Bay', riskLevel: 'High Risk', gasPpm: 185.0, temp: 34.5, workers: 3, color: '#ef4444' },
+        'Zone C': { name: 'Pipeline Corridor & Process', riskLevel: 'Warning', gasPpm: 46.0, temp: 26.2, workers: 5, color: '#f59e0b' },
+        'Zone D': { name: 'Venting & Flare Recovery Unit', riskLevel: 'Normal', gasPpm: 8.5, temp: 22.8, workers: 2, color: '#10b981' },
+      },
+      probableLeakZone: 'Zone B',
+      leakConfidence: 89, // %
+      airflow: { direction: 'North-East (45°)', speed: 2.4 }, // m/s
+
+      // Workers Safety Telemetry
+      totalWorkers: 14,
+      workersSafe: 9,
+      workersNearRisk: 2,
+      workersExposed: 3, // In Zone B
+      evacuationRecommendation: 'Evacuate Zone B immediately via West Exit 2. Deploy Class-B SCBA gear. Keep clear of downwind corridor Zone C.',
+      workerList: [
+        { id: 'W-01', name: 'Mark Vance', role: 'Valve Technician', zone: 'Zone B', x: 440, y: 130, exposurePpm: 185, status: 'Critical', hr: 114, badge: 'VIBRATING + AUDIBLE' },
+        { id: 'W-02', name: 'Sarah Jenkins', role: 'Safety Inspector', zone: 'Zone B', x: 490, y: 165, exposurePpm: 142, status: 'Critical', hr: 106, badge: 'VIBRATING + AUDIBLE' },
+        { id: 'W-03', name: 'David Cole', role: 'Pipe Fitter', zone: 'Zone B', x: 380, y: 85, exposurePpm: 94, status: 'Warning', hr: 98, badge: 'ALERT STROBE' },
+        { id: 'W-04', name: 'Elena Rostova', role: 'Control Operator', zone: 'Zone A', x: 130, y: 110, exposurePpm: 10, status: 'Safe', hr: 72, badge: 'NOMINAL' },
+        { id: 'W-05', name: 'Carlos Mendez', role: 'Logistics Handler', zone: 'Zone A', x: 210, y: 170, exposurePpm: 12, status: 'Safe', hr: 75, badge: 'NOMINAL' },
+        { id: 'W-06', name: 'Amara Okafor', role: 'Process Engineer', zone: 'Zone C', x: 140, y: 310, exposurePpm: 24, status: 'Safe', hr: 79, badge: 'STANDBY' },
+        { id: 'W-07', name: 'Jin Woo', role: 'Corridor Inspector', zone: 'Zone C', x: 270, y: 340, exposurePpm: 38, status: 'Warning', hr: 88, badge: 'MONITORING' },
+        { id: 'W-08', name: 'Liam Davies', role: 'Venting Specialist', zone: 'Zone D', x: 440, y: 320, exposurePpm: 8, status: 'Safe', hr: 70, badge: 'NOMINAL' },
+      ],
+
+      // Alarm & Safety Systems
+      primaryAlarmHealth: 'HEALTHY', // 'HEALTHY' | 'FAILED'
+      primaryAlarmState: 'ACTIVE', // 'STANDBY' | 'ACTIVE' | 'FAILED' | 'ACKNOWLEDGED'
+      backupAlertsActive: true,
+      visualBeaconActive: true,
+      workerWearableAlert: true,
+      controlRoomAlert: true,
+      voiceAlertActive: true,
+      primaryAlarmSimulatedFail: true, // Default demonstrates failure verification feature
+
+      // Multi-Layer Safety Layers
+      safetyLayers: [
+        { id: 1, name: 'Primary Sirens & Strobes', status: 'FAILED', type: 'Primary Buzzer', desc: 'Audible industrial hooter network' },
+        { id: 2, name: 'Visual Xenon Beacons', status: 'ACTIVE', type: 'Visual Beacon', desc: 'Overhead 360° amber/red flashers' },
+        { id: 3, name: 'Dashboard SCADA Warning', status: 'ACTIVE', type: 'Control Room HUD', desc: 'Priority control-room telemetry banner' },
+        { id: 4, name: 'Worker Wearable Badge (LoRa)', status: 'ACTIVE', type: 'Personal Haptic', desc: 'Vibrating dosimeter tag on wrist/chest' },
+        { id: 5, name: 'Control-Room Override Ping', status: 'ACTIVE', type: 'Central Command', desc: 'SCADA emergency priority dispatch' },
+        { id: 6, name: 'Autonomous Voice Synthesis', status: 'ACTIVE', type: 'PA Broadcast', desc: 'Multi-lingual automated vocal evacuation instructions' },
+        { id: 7, name: 'Dynamic Egress Guidance', status: 'ACTIVE', type: 'Evacuation System', desc: 'Active laser directional indicators towards West Exit' },
+      ],
+
+      // Resilience Score & Layers Breakdown
+      resilienceScore: 78, // out of 100
+      resilienceLayers: [
+        { name: 'Gas Detection', score: 88, weight: 20, status: 'Strong', desc: 'E-Nose 5-channel ensemble recognition' },
+        { name: 'Equipment Health', score: 64, weight: 20, status: 'Weak', desc: 'Valve V-101 requires attention (64%)' },
+        { name: 'Sensor Reliability', score: 86, weight: 15, status: 'Good', desc: 'Cross-sensor consensus algorithm' },
+        { name: 'Alarm Reliability', score: 62, weight: 15, status: 'Attention', desc: 'Primary alarm offline; backup taking load' },
+        { name: 'Emergency Comm', score: 94, weight: 15, status: 'Optimal', desc: 'Redundant LoRa + Voice + Strobes active' },
+        { name: 'Worker Safety', score: 72, weight: 15, status: 'Moderate', desc: '3 workers in high exposure zone perimeter' },
+      ],
+
+      // Historical Incidents
+      historicalIncidents: [
+        { id: 'INC-2026-003', date: '2026-09-14', zone: 'Zone B', gas: 'Ammonia (NH₃)', peakPpm: 210, cause: 'Valve V-101 Gland Seal Micro-Crack', alarmStatus: 'Primary Alarm Failed -> Backup Intercepted', casualties: 0, durationMin: 18, lessons: 'Identified actuator vibration pre-cursor 26 mins prior. Validated secondary LoRa alert necessity.' },
+        { id: 'INC-2026-001', date: '2026-03-22', zone: 'Zone C', gas: 'Methane (CH₄)', peakPpm: 145, cause: 'Corridor Flange Thermal Contraction', alarmStatus: 'Primary Alarm Succeeded', casualties: 0, durationMin: 12, lessons: 'Automated isolation valve actuated in 4.2 seconds; zero worker exposure over OSHA ceiling.' },
+        { id: 'INC-2025-089', date: '2025-11-05', zone: 'Zone A', gas: 'Ammonia (NH₃)', peakPpm: 78, cause: 'Sensor 4 Electro-drift False Alarm', alarmStatus: 'Suppressed via Cross-Sensor Voting', casualties: 0, durationMin: 5, lessons: 'Prevented unnecessary $45k plant shutdown via 5-sensor consensus algorithm.' },
+        { id: 'INC-2025-044', date: '2025-07-19', zone: 'Zone B', gas: 'Hydrogen Sulfide (H₂S)', peakPpm: 195, cause: 'Compressor C-302 Secondary O-ring Fatigue', alarmStatus: 'Primary Buzzer Corroded -> Backup PA Evacuated', casualties: 0, durationMin: 22, lessons: 'Triggered mandate for autonomous secondary voice alert backup systems.' },
+      ],
+
+      // Simulation Settings
+      liveStreamEnabled: true,
+      emergencySimActive: false,
+      emergencySimStep: 0,
+    };
+
+    // ==========================================
+    // MAIN APP COMPONENT
+    // ==========================================
+    function GasGuardApp() {
+      const [state, setState] = useState(INITIAL_STATE);
+      const [activeTab, setActiveTab] = useState('dashboard');
+      const [isSimDrawerOpen, setIsSimDrawerOpen] = useState(false);
+      const [isXaiModalOpen, setIsXaiModalOpen] = useState(false);
+      const [xaiTopic, setXaiTopic] = useState('risk');
+      const [soundMuted, setSoundMuted] = useState(false);
+      const [speechMuted, setSpeechMuted] = useState(false);
+      const [systemTime, setSystemTime] = useState(new Date().toLocaleTimeString());
+      const [whatIfResults, setWhatIfResults] = useState(null);
+
+      // Keep sounds synced with state
+      useEffect(() => {
+        sound.audioEnabled = !soundMuted;
+        sound.speechEnabled = !speechMuted;
+      }, [soundMuted, speechMuted]);
+
+      // Clock ticker
+      useEffect(() => {
+        const timer = setInterval(() => {
+          setSystemTime(new Date().toLocaleTimeString());
+        }, 1000);
+        return () => clearInterval(timer);
+      }, []);
+
+      // Live simulated telemetry jitter (realistic industrial sensor fluctuation)
+      useEffect(() => {
+        if (!state.liveStreamEnabled || state.emergencySimActive) return;
+        const interval = setInterval(() => {
+          setState(prev => {
+            const jitterGas = Number((Math.sin(Date.now() / 3000) * 1.2).toFixed(1));
+            const jitterPressure = Number((Math.cos(Date.now() / 4000) * 0.03).toFixed(2));
+            const jitterTemp = Number((Math.sin(Date.now() / 5000) * 0.15).toFixed(1));
+            const jitterVib = Number((Math.cos(Date.now() / 2500) * 0.08).toFixed(2));
+
+            // Dynamic Sensor responses with slight random noise
+            const updatedSensors = prev.sensors.map(s => {
+              if (prev.sensorFaultSimulated && s.id === 4) {
+                return { ...s, reading: 22, trust: 42, status: 'Fault Detected' };
+              }
+              const noise = Math.floor((Math.random() - 0.5) * 4);
+              return { ...s, reading: Math.max(10, s.baseline + Math.round(prev.gasConcentration * 0.6) + noise) };
+            });
+
+            return {
+              ...prev,
+              gasConcentration: Math.max(5, Number((prev.gasConcentration + jitterGas).toFixed(1))),
+              pressure: Math.max(0.5, Number((prev.pressure + jitterPressure).toFixed(2))),
+              temperature: Math.max(10, Number((prev.temperature + jitterTemp).toFixed(1))),
+              vibration: Math.max(0.2, Number((prev.vibration + jitterVib).toFixed(2))),
+              sensors: updatedSensors,
+            };
+          });
+        }, 2500);
+        return () => clearInterval(interval);
+      }, [state.liveStreamEnabled, state.emergencySimActive, state.sensorFaultSimulated]);
+
+      // Dynamic Risk Calculation
+      const currentRisk = useMemo(() => {
+        const ppm = state.gasConcentration;
+        const vib = state.vibration;
+        const press = state.pressure;
+        const valveHealth = state.equipment.find(e => e.id === 'V-101')?.health || 64;
+
+        let score = 20; // baseline
+        if (ppm > 25) score += Math.min(45, (ppm - 25) * 0.35);
+        if (vib > 2.0) score += Math.min(20, (vib - 2.0) * 4.5);
+        if (press > 2.8) score += Math.min(15, (press - 2.8) * 8.0);
+        if (valveHealth < 75) score += (75 - valveHealth) * 0.4;
+        
+        score = Math.min(98, Math.max(15, Math.round(score)));
+
+        let level = 'Normal';
+        let color = '#10b981';
+        let badgeClass = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40';
+        let icon = '🟢';
+
+        if (score >= 80) {
+          level = 'Critical';
+          color = '#ef4444';
+          badgeClass = 'bg-red-500/20 text-red-400 border-red-500/40 animate-pulse';
+          icon = '🔴';
+        } else if (score >= 65) {
+          level = 'High Risk';
+          color = '#f97316';
+          badgeClass = 'bg-orange-500/20 text-orange-400 border-orange-500/40';
+          icon = '🟠';
+        } else if (score >= 40) {
+          level = 'Warning';
+          color = '#f59e0b';
+          badgeClass = 'bg-amber-500/20 text-amber-400 border-amber-500/40';
+          icon = '🟡';
+        }
+
+        return { score, level, color, badgeClass, icon };
+      }, [state.gasConcentration, state.vibration, state.pressure, state.equipment]);
+
+      // Calculate dynamic Resilience Score
+      const computedResilience = useMemo(() => {
+        let alarmScore = state.primaryAlarmHealth === 'FAILED' ? 45 : 85;
+        let sensorScore = state.sensorFaultSimulated ? 65 : 88;
+        let equipAvg = Math.round(state.equipment.reduce((acc, e) => acc + e.health, 0) / state.equipment.length);
+        let gasScore = currentRisk.score > 75 ? 40 : currentRisk.score > 50 ? 68 : 92;
+        let workerScore = state.workersExposed > 0 ? 60 : 90;
+        let commScore = state.backupAlertsActive ? 95 : 70;
+
+        let total = Math.round((alarmScore * 0.15) + (sensorScore * 0.15) + (equipAvg * 0.2) + (gasScore * 0.2) + (workerScore * 0.15) + (commScore * 0.15));
+        total = Math.max(25, Math.min(98, total));
+        
+        return {
+          total,
+          layers: [
+            { name: 'Gas Detection', score: gasScore, status: gasScore > 75 ? 'Optimal' : 'Elevated' },
+            { name: 'Equipment Health', score: equipAvg, status: equipAvg > 75 ? 'Nominal' : 'Attention' },
+            { name: 'Sensor Reliability', score: sensorScore, status: sensorScore > 75 ? 'Valid' : 'Fault Detected' },
+            { name: 'Alarm Reliability', score: alarmScore, status: state.primaryAlarmHealth === 'FAILED' ? 'Failed (Backup Active)' : 'Healthy' },
+            { name: 'Emergency Comm', score: commScore, status: 'Redundant' },
+            { name: 'Worker Safety', score: workerScore, status: state.workersExposed > 0 ? 'Hazard Perimeter' : 'Safe' },
+          ]
+        };
+      }, [state.primaryAlarmHealth, state.sensorFaultSimulated, state.equipment, currentRisk.score, state.workersExposed, state.backupAlertsActive]);
+
+      // ==========================================
+      // SIMULATION ACTION HANDLERS
+      // ==========================================
+      const handleSimulateAlarmFailure = () => {
+        sound.playClick();
+        setState(prev => {
+          const isFailing = prev.primaryAlarmHealth === 'HEALTHY';
+          if (isFailing) {
+            sound.playAlarmSiren();
+            sound.speak("Primary alarm failure detected. Autonomous backup emergency response activated. All personnel proceed to evacuation points.");
+          }
+          return {
+            ...prev,
+            primaryAlarmHealth: isFailing ? 'FAILED' : 'HEALTHY',
+            primaryAlarmState: isFailing ? 'FAILED' : 'ACTIVE',
+            primaryAlarmSimulatedFail: isFailing,
+            backupAlertsActive: true,
+            visualBeaconActive: true,
+            workerWearableAlert: true,
+            voiceAlertActive: true,
+            controlRoomAlert: true,
+            safetyLayers: prev.safetyLayers.map(l => l.id === 1 ? { ...l, status: isFailing ? 'FAILED' : 'ACTIVE' } : l),
+          };
+        });
+      };
+
+      const handleToggleSensorFault = () => {
+        sound.playClick();
+        setState(prev => {
+          const newFault = !prev.sensorFaultSimulated;
+          if (newFault) {
+            sound.playWarningBeep();
+            sound.speak("Warning. Sensor S-04 drift detected. Cross-sensor voting engaged.");
+          }
+          return {
+            ...prev,
+            sensorFaultSimulated: newFault,
+            sensors: prev.sensors.map(s => {
+              if (s.id === 4) {
+                return newFault 
+                  ? { ...s, reading: 22, trust: 42, status: 'Possible Sensor Fault Detected' }
+                  : { ...s, reading: 102, trust: 92, status: 'Normal' };
+              }
+              return s;
+            })
+          };
+        });
+      };
+
+      const handleSimulateGasLeak = () => {
+        sound.playClick();
+        sound.playAlarmSiren();
+        sound.speak("Emergency! Toxic Ammonia gas leak detected in Zone B. Compressor Bay perimeter critical. Evacuate Zone B immediately.");
+        setState(prev => ({
+          ...prev,
+          gasConcentration: 188.5,
+          gasType: 'Ammonia (NH₃)',
+          vibration: 7.8,
+          pressure: 3.45,
+          temperature: 38.0,
+          probableLeakZone: 'Zone B',
+          leakConfidence: 94,
+          workersExposed: 3,
+          primaryAlarmState: prev.primaryAlarmHealth === 'FAILED' ? 'FAILED' : 'ACTIVE',
+          backupAlertsActive: true,
+          visualBeaconActive: true,
+          zones: {
+            ...prev.zones,
+            'Zone B': { ...prev.zones['Zone B'], riskLevel: 'Critical', gasPpm: 188.5 },
+            'Zone C': { ...prev.zones['Zone C'], riskLevel: 'Warning', gasPpm: 52.0 },
+          }
+        }));
+      };
+
+      const handleResetSystem = () => {
+        sound.playClick();
+        sound.speak("System restored to nominal operating baseline.");
+        setState(INITIAL_STATE);
+        setWhatIfResults(null);
+      };
+
+      // 8-Step Emergency Simulation Walkthrough
+      const handleStartEmergencySimulation = () => {
+        sound.playClick();
+        setState(prev => ({ ...prev, emergencySimActive: true, emergencySimStep: 1 }));
+        runEmergencyStep(1);
+      };
+
+      const runEmergencyStep = (step) => {
+        if (step > 8) {
+          setState(prev => ({ ...prev, emergencySimActive: false, emergencySimStep: 0 }));
+          sound.speak("Emergency simulation completed. Incident report archived.");
+          return;
+        }
+
+        setState(prev => {
+          let updated = { ...prev, emergencySimStep: step };
+          if (step === 1) {
+            sound.playWarningBeep();
+            sound.speak("Step 1: Valve V-101 vibration anomaly detected. Pressure fluctuation registered.");
+            updated.vibration = 6.2;
+            updated.pressure = 3.1;
+          } else if (step === 2) {
+            sound.playAlarmSiren();
+            sound.speak("Step 2: E-Nose array detects Ammonia gas concentration rising past threshold.");
+            updated.gasConcentration = 145.0;
+          } else if (step === 3) {
+            sound.speak("Step 3: AI Pre-Leak Model elevates facility risk level to Critical.");
+          } else if (step === 4) {
+            sound.speak("Step 4: AI multi-sensor gradient localizes probable leak to Zone B Compressor Bay.");
+            updated.probableLeakZone = 'Zone B';
+            updated.leakConfidence = 96;
+          } else if (step === 5) {
+            sound.speak("Step 5: Worker exposure algorithm identifies 3 personnel in hazardous perimeter.");
+            updated.workersExposed = 3;
+          } else if (step === 6) {
+            sound.playAlarmSiren();
+            sound.speak("Step 6: Primary Alarm verification heartbeat checks siren. Primary alarm is FAILED.");
+            updated.primaryAlarmHealth = 'FAILED';
+            updated.primaryAlarmState = 'FAILED';
+          } else if (step === 7) {
+            sound.speak("Step 7: Autonomous Backup Emergency Alert engages. Xenon strobes active. Wearable LoRa buzzers active. Voice evacuation dispatched.");
+            updated.backupAlertsActive = true;
+            updated.visualBeaconActive = true;
+            updated.workerWearableAlert = true;
+          } else if (step === 8) {
+            sound.speak("Step 8: Dynamic evacuation routing guiding personnel to West Exit 2. Automated isolation valve commanded to seal.");
+            updated.workersExposed = 0;
+            updated.workersSafe = 14;
+          }
+          return updated;
+        });
+
+        // Auto-advance simulation after 3.8 seconds per step
+        setTimeout(() => {
+          setState(current => {
+            if (current.emergencySimActive && current.emergencySimStep === step) {
+              runEmergencyStep(step + 1);
+            }
+            return current;
+          });
+        }, 3800);
+      };
+
+      // Run What-If Scenario in Digital Twin
+      const runWhatIfScenario = (scenarioKey) => {
+        sound.playClick();
+        let scenarioName = '';
+        let deltaRisk = 0;
+        let deltaGas = 0;
+        let deltaHealth = 0;
+        let notes = '';
+
+        if (scenarioKey === 'VALVE_FAIL') {
+          scenarioName = 'Pneumatic Valve V-101 Seal Breach';
+          deltaRisk = +45;
+          deltaGas = +120;
+          deltaHealth = -35;
+          notes = 'Triggers high vibration, micro-leakage in Zone B, and actuator pressure drop.';
+          setState(prev => ({
+            ...prev,
+            vibration: 8.5,
+            gasConcentration: 148,
+            equipment: prev.equipment.map(e => e.id === 'V-101' ? { ...e, health: 32, status: 'Critical Fault', isFailed: true } : e)
+          }));
+        } else if (scenarioKey === 'PIPE_SURGE') {
+          scenarioName = 'Pipeline P-204 Pressure Surge';
+          deltaRisk = +35;
+          deltaGas = +75;
+          deltaHealth = -22;
+          notes = 'Corridor pressure increases to 4.2 bar; acoustic stress detected on weld seams.';
+          setState(prev => ({
+            ...prev,
+            pressure: 4.15,
+            equipment: prev.equipment.map(e => e.id === 'P-204' ? { ...e, health: 68, status: 'High Stress' } : e)
+          }));
+        } else if (scenarioKey === 'VENT_CUT') {
+          scenarioName = 'Facility Ventilation 50% Reduction';
+          deltaRisk = +50;
+          deltaGas = +160;
+          deltaHealth = 0;
+          notes = 'Gas plume dispersion rate drops by 65%, rapidly multiplying ambient concentration.';
+          setState(prev => ({
+            ...prev,
+            gasConcentration: 195,
+            airflow: { direction: 'Stagnant (Calm)', speed: 0.4 }
+          }));
+        } else if (scenarioKey === 'ALARM_FAIL') {
+          scenarioName = 'Primary Alarm Audible Siren Power Cut';
+          deltaRisk = +25;
+          deltaGas = 0;
+          deltaHealth = -40;
+          notes = 'Primary siren silent; system autonomously routes failover through LoRa wearables & visual beacons.';
+          handleSimulateAlarmFailure();
+        } else if (scenarioKey === 'SENSOR_DRIFT') {
+          scenarioName = 'Sensor S-04 Humidity & Poisoning Drift';
+          deltaRisk = +15;
+          deltaGas = 0;
+          deltaHealth = -18;
+          notes = 'Sensor S-04 trust drops to 42%. Cross-sensor consensus engine isolates faulty sensor.';
+          handleToggleSensorFault();
+        }
+
+        sound.speak(`What if scenario executed: ${scenarioName}`);
+        setWhatIfResults({
+          name: scenarioName,
+          deltaRisk,
+          deltaGas,
+          deltaHealth,
+          notes,
+          timestamp: new Date().toLocaleTimeString()
+        });
+      };
+
+      return (
+        <div className="flex flex-col min-h-screen text-slate-100 selection:bg-cyan-500 selection:text-white">
+          
+          {/* ======================================================== */}
+          {/* 1. TOP HEADER & TELEMETRY SCADA COMMAND BAR             */}
+          {/* ======================================================== */}
+          <header className="sticky top-0 z-50 bg-cyber-950/95 border-b border-cyber-700/60 backdrop-blur-md px-4 py-2.5 shadow-xl">
+            <div className="max-w-[1780px] mx-auto flex flex-wrap items-center justify-between gap-3">
+              
+              {/* Brand & Tagline */}
+              <div className="flex items-center gap-3">
+                <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 shadow-lg shadow-cyan-500/20">
+                  <span className="text-xl font-black text-white tracking-tighter">GX</span>
+                  <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-400 animate-ping"></div>
+                  <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-400"></div>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-xl font-extrabold tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-white via-cyan-200 to-cyan-400">
+                      GASGUARD <span className="text-cyan-400">X</span>
+                    </h1>
+                    <span className="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                      AI SAFETY INTELLIGENCE
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 font-mono tracking-wide">
+                    Detect. Predict. Verify. Protect. &bull; <span className="text-slate-300">Multi-Layer Industrial Protection</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Real-time System Status Pills */}
+              <div className="flex items-center flex-wrap gap-2 text-xs font-mono">
+                {/* UTC / Local Clock */}
+                <div className="px-3 py-1.5 rounded-lg bg-cyber-900 border border-cyber-700/60 text-slate-300 flex items-center gap-2">
+                  <span className="inline-block w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                  <span>SYS TIME: <strong className="text-white">{systemTime}</strong></span>
+                </div>
+
+                {/* Primary Alarm Heartbeat */}
+                <div className={`px-3 py-1.5 rounded-lg border flex items-center gap-2 ${
+                  state.primaryAlarmHealth === 'FAILED'
+                    ? 'bg-red-500/15 border-red-500/60 text-red-300 animate-pulse glow-red'
+                    : 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300'
+                }`}>
+                  <span>{state.primaryAlarmHealth === 'FAILED' ? '❌' : '🔔'}</span>
+                  <span>PRIMARY ALARM: <strong>{state.primaryAlarmHealth}</strong></span>
+                </div>
+
+                {/* Backup Alert Heartbeat */}
+                <div className={`px-3 py-1.5 rounded-lg border flex items-center gap-2 ${
+                  state.backupAlertsActive 
+                    ? 'bg-cyan-500/15 border-cyan-500/50 text-cyan-300 glow-cyan' 
+                    : 'bg-slate-800 border-slate-700 text-slate-400'
+                }`}>
+                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+                  <span>BACKUP: <strong>{state.backupAlertsActive ? 'ACTIVATED' : 'STANDBY'}</strong></span>
+                </div>
+
+                {/* Risk Level Badge */}
+                <div className={`px-3 py-1.5 rounded-lg border flex items-center gap-2 font-bold ${currentRisk.badgeClass}`}>
+                  <span>{currentRisk.icon}</span>
+                  <span>RISK: {currentRisk.level.toUpperCase()} ({currentRisk.score}/100)</span>
+                </div>
+              </div>
+
+              {/* Global Quick Action Buttons */}
+              <div className="flex items-center gap-2">
+                {/* 🚨 Emergency Simulation Button */}
+                <button
+                  id="btnStartEmergency"
+                  onClick={handleStartEmergencySimulation}
+                  disabled={state.emergencySimActive}
+                  className="px-3.5 py-1.5 rounded-lg font-bold text-xs bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 text-white shadow-lg shadow-red-600/30 border border-red-400/40 transition-all flex items-center gap-1.5 disabled:opacity-50"
+                  title="Run automated 8-step emergency response demonstration"
+                >
+                  <span className="text-sm">🚨</span>
+                  <span>{state.emergencySimActive ? `SIM STEP ${state.emergencySimStep}/8` : 'START EMERGENCY SIM'}</span>
+                </button>
+
+                {/* ⚡ Simulate Alarm Failure Button (Feature 9) */}
+                <button
+                  id="btnSimulateAlarmFail"
+                  onClick={handleSimulateAlarmFailure}
+                  className={`px-3 py-1.5 rounded-lg font-bold text-xs border transition-all flex items-center gap-1.5 ${
+                    state.primaryAlarmHealth === 'FAILED'
+                      ? 'bg-amber-600 text-white border-amber-400 shadow-lg shadow-amber-500/30'
+                      : 'bg-cyber-800 hover:bg-cyber-700 text-amber-300 border-amber-500/40'
+                  }`}
+                  title="Simulate Primary Alarm loss and observe autonomous backup failover"
+                >
+                  <span>⚡</span>
+                  <span>{state.primaryAlarmHealth === 'FAILED' ? 'RESTORE PRIMARY ALARM' : 'SIMULATE ALARM FAILURE'}</span>
+                </button>
+
+                {/* Quick Leak Trigger */}
+                <button
+                  id="btnSimulateGasLeak"
+                  onClick={handleSimulateGasLeak}
+                  className="px-3 py-1.5 rounded-lg font-semibold text-xs bg-cyber-800 hover:bg-cyan-950 text-cyan-300 border border-cyan-500/40 transition-all flex items-center gap-1"
+                  title="Simulate acute Ammonia release in Zone B"
+                >
+                  <span>💨</span>
+                  <span>TRIGGER LEAK</span>
+                </button>
+
+                {/* Sound & Speech Toggles */}
+                <div className="flex items-center bg-cyber-900 border border-cyber-700/60 rounded-lg p-0.5">
+                  <button
+                    onClick={() => { sound.playClick(); setSoundMuted(!soundMuted); }}
+                    className={`p-1.5 rounded text-xs transition-colors ${!soundMuted ? 'text-cyan-400 bg-cyber-800' : 'text-slate-500'}`}
+                    title={soundMuted ? "Unmute audio siren & clicks" : "Mute audio sound"}
+                  >
+                    {!soundMuted ? '🔊' : '🔇'}
+                  </button>
+                  <button
+                    onClick={() => { sound.playClick(); setSpeechMuted(!speechMuted); }}
+                    className={`p-1.5 rounded text-xs transition-colors ${!speechMuted ? 'text-cyan-400 bg-cyber-800' : 'text-slate-500'}`}
+                    title={speechMuted ? "Unmute voice synthesiser" : "Mute voice synthesiser"}
+                  >
+                    🗣️
+                  </button>
+                </div>
+
+                {/* Simulator Controls Drawer Button */}
+                <button
+                  id="btnOpenSimDrawer"
+                  onClick={() => { sound.playClick(); setIsSimDrawerOpen(!isSimDrawerOpen); }}
+                  className="px-3 py-1.5 rounded-lg font-bold text-xs bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-400/40 transition-all flex items-center gap-1.5 shadow-md shadow-indigo-600/30"
+                >
+                  <span>🎛️</span>
+                  <span>CONTROLS</span>
+                </button>
+
+                {/* Reset System */}
+                <button
+                  id="btnResetSystem"
+                  onClick={handleResetSystem}
+                  className="p-1.5 rounded-lg bg-cyber-800 hover:bg-cyber-700 text-slate-400 hover:text-white border border-cyber-700 transition-colors"
+                  title="Reset plant to nominal baseline"
+                >
+                  🔄
+                </button>
+              </div>
+
+            </div>
+          </header>
+
+          {/* ======================================================== */}
+          {/* HIGH-PRIORITY PROMINENT NOTIFICATION BANNER             */}
+          {/* ======================================================== */}
+          {state.primaryAlarmHealth === 'FAILED' && (
+            <div className="bg-gradient-to-r from-red-950 via-red-900 to-amber-950 border-y border-red-500/60 px-4 py-2.5 text-white shadow-2xl relative overflow-hidden animate-pulse">
+              <div className="max-w-[1780px] mx-auto flex items-center justify-between flex-wrap gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-red-600 flex items-center justify-center text-lg font-bold animate-ping">
+                    ⚠️
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-sm tracking-wide text-red-200 uppercase">
+                      CRITICAL SAFETY NOTICE: Primary Alarm Heartbeat Lost / Failure Detected
+                    </h4>
+                    <p className="text-xs text-red-100 font-mono">
+                      “Primary alarm may have failed. Autonomous backup emergency response activated: Xenon Strobes ON &bull; LoRa Wearables ON &bull; Voice Alert ON &bull; Dynamic Egress Active.”
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-1 rounded bg-red-600/60 text-xs font-mono font-bold border border-red-400">
+                    FAILOVER ACTIVE
+                  </span>
+                  <button 
+                    onClick={handleSimulateAlarmFailure}
+                    className="px-3 py-1 rounded bg-white text-red-900 text-xs font-bold hover:bg-slate-200 transition-colors"
+                  >
+                    Reset Alarm Test
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Emergency Step Progress Bar */}
+          {state.emergencySimActive && (
+            <div className="bg-cyber-900 border-b border-cyan-500/40 px-4 py-2 text-xs font-mono">
+              <div className="max-w-[1780px] mx-auto flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2 text-cyan-300">
+                  <span className="animate-spin">⚙️</span>
+                  <strong>LIVE EMERGENCY WALKTHROUGH:</strong>
+                  <span>Step {state.emergencySimStep} of 8</span>
+                </div>
+                <div className="flex-1 max-w-xl bg-cyber-950 rounded-full h-2 overflow-hidden border border-cyber-700">
+                  <div 
+                    className="bg-gradient-to-r from-cyan-500 via-amber-500 to-red-500 h-full transition-all duration-500" 
+                    style={{ width: `${(state.emergencySimStep / 8) * 100}%` }}
+                  ></div>
+                </div>
+                <button
+                  onClick={() => setState(prev => ({ ...prev, emergencySimActive: false }))}
+                  className="text-red-400 hover:text-red-300 underline"
+                >
+                  Abort Simulation
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ======================================================== */}
+          {/* MAIN APPLICATION BODY & SIDEBAR NAVIGATION             */}
+          {/* ======================================================== */}
+          <div className="flex-1 max-w-[1780px] w-full mx-auto p-4 flex flex-col lg:flex-row gap-4">
+
+            {/* Sidebar Navigation */}
+            <aside className="w-full lg:w-64 flex-shrink-0">
+              <div className="glass-card rounded-2xl p-3 sticky top-20 flex flex-col gap-1.5 shadow-xl">
+                <div className="px-3 py-2 text-[10px] font-mono uppercase tracking-widest text-slate-400 flex items-center justify-between border-b border-cyber-700/50 mb-1">
+                  <span>Navigation Hub</span>
+                  <span className="text-cyan-400">V4.8-PRO</span>
+                </div>
+
+                {[
+                  { id: 'dashboard', label: 'Dashboard Overview', icon: '📊', badge: null },
+                  { id: 'enose', label: 'E-Nose Gas Detection', icon: '👃', badge: '5-Sensors' },
+                  { id: 'risk', label: 'Pre-Leak Risk Prediction', icon: '📈', badge: `${currentRisk.score}%` },
+                  { id: 'equipment', label: 'Equipment Health', icon: '⚙️', badge: '5 Assets' },
+                  { id: 'localization', label: 'Leak Localization Map', icon: '🗺️', badge: state.probableLeakZone },
+                  { id: 'workers', label: 'Worker Safety & Exposure', icon: '👷', badge: `${state.workersExposed} Risk` },
+                  { id: 'emergency', label: 'Emergency & Redundant Alerts', icon: '🚨', badge: 'Multi-Layer' },
+                  { id: 'sensors', label: 'Sensor Reliability / Trust', icon: '🔬', badge: state.sensorFaultSimulated ? 'Fault' : 'OK' },
+                  { id: 'resilience', label: 'Safety Resilience Score', icon: '🛡️', badge: `${computedResilience.total}/100` },
+                  { id: 'digitaltwin', label: 'Digital Twin Simulator', icon: '🔮', badge: 'What-If' },
+                  { id: 'timeline', label: 'Root Cause & Failure Chain', icon: '🔗', badge: 'Timeline' },
+                  { id: 'incidents', label: 'Incident Intelligence', icon: '📁', badge: 'Archives' },
+                  { id: 'xai', label: 'Explainable AI (XAI)', icon: '💡', badge: 'SHAP' },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    id={`nav_${item.id}`}
+                    onClick={() => { sound.playClick(); setActiveTab(item.id); }}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition-all text-left ${
+                      activeTab === item.id
+                        ? 'bg-gradient-to-r from-cyan-600/30 to-blue-600/20 text-cyan-300 border border-cyan-500/50 shadow-md shadow-cyan-900/30'
+                        : 'text-slate-300 hover:bg-cyber-800/60 hover:text-white border border-transparent'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 truncate">
+                      <span className="text-base">{item.icon}</span>
+                      <span className="truncate">{item.label}</span>
+                    </div>
+                    {item.badge && (
+                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${
+                        item.id === 'emergency' && state.primaryAlarmHealth === 'FAILED'
+                          ? 'bg-red-500/20 text-red-300 border-red-500/40 animate-pulse'
+                          : 'bg-cyber-800 text-slate-400 border-cyber-700'
+                      }`}>
+                        {item.badge}
+                      </span>
+                    )}
+                  </button>
+                ))}
+
+                {/* System Statement Footer in Sidebar */}
+                <div className="mt-4 p-3 rounded-xl bg-cyber-900/80 border border-cyber-700/60 text-[11px] text-slate-400 leading-relaxed font-sans">
+                  <div className="text-cyan-400 font-bold mb-1 flex items-center gap-1">
+                    <span>🛡️</span> SYSTEM MISSION
+                  </div>
+                  GASGUARD X is an AI-powered industrial safety intelligence platform that predicts gas-leak risks, identifies probable leak zones, monitors equipment and sensor reliability, verifies safety-system failures, predicts worker exposure, and provides multi-layer emergency response.
+                </div>
+              </div>
+            </aside>
+
+            {/* Main Content Area */}
+            <main className="flex-1 min-w-0 flex flex-col gap-4">
+              
+              {/* TOP 8 KPI CARDS - PRESENT ON DASHBOARD & QUICK OVERVIEW */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2.5">
+                
+                {/* 1. Overall Safety Resilience */}
+                <div className="glass-card rounded-xl p-3 flex flex-col justify-between border-indigo-500/30 relative overflow-hidden group">
+                  <div className="text-[10px] font-mono uppercase text-slate-400">Resilience Score</div>
+                  <div className="flex items-baseline gap-1 my-1">
+                    <span className="text-2xl font-black text-indigo-400">{computedResilience.total}</span>
+                    <span className="text-xs text-slate-400 font-mono">/100</span>
+                  </div>
+                  <div className="text-[10px] text-indigo-300 font-mono flex items-center justify-between">
+                    <span>Min: Equip (64%)</span>
+                    <span>🛡️</span>
+                  </div>
+                </div>
+
+                {/* 2. Current Gas Status */}
+                <div className="glass-card rounded-xl p-3 flex flex-col justify-between border-cyan-500/30">
+                  <div className="text-[10px] font-mono uppercase text-slate-400">Detected Gas</div>
+                  <div className="my-1">
+                    <div className="text-sm font-bold text-cyan-300 truncate">{state.gasType}</div>
+                    <div className="text-xs font-mono text-white font-bold">{state.gasConcentration} PPM</div>
+                  </div>
+                  <div className="text-[10px] text-slate-400 font-mono flex items-center justify-between">
+                    <span>92% AI Conf</span>
+                    <span className="text-cyan-400">NH₃</span>
+                  </div>
+                </div>
+
+                {/* 3. Pre-Leak Risk Level */}
+                <div className={`glass-card rounded-xl p-3 flex flex-col justify-between border ${currentRisk.badgeClass}`}>
+                  <div className="text-[10px] font-mono uppercase">Pre-Leak Risk</div>
+                  <div className="flex items-baseline gap-1 my-1">
+                    <span className="text-2xl font-black">{currentRisk.score}</span>
+                    <span className="text-xs font-mono">/100</span>
+                  </div>
+                  <div className="text-[10px] font-mono font-bold flex items-center justify-between">
+                    <span>{currentRisk.level}</span>
+                    <span>{currentRisk.icon}</span>
+                  </div>
+                </div>
+
+                {/* 4. Probable Leak Zone */}
+                <div className="glass-card rounded-xl p-3 flex flex-col justify-between border-amber-500/30">
+                  <div className="text-[10px] font-mono uppercase text-slate-400">Probable Zone</div>
+                  <div className="my-1">
+                    <div className="text-base font-extrabold text-amber-300">{state.probableLeakZone}</div>
+                    <div className="text-[10px] text-slate-400">Compressor Bay</div>
+                  </div>
+                  <div className="text-[10px] text-amber-400 font-mono flex items-center justify-between">
+                    <span>{state.leakConfidence}% Conf</span>
+                    <span>📍</span>
+                  </div>
+                </div>
+
+                {/* 5. Workers At Risk */}
+                <div className="glass-card rounded-xl p-3 flex flex-col justify-between border-purple-500/30">
+                  <div className="text-[10px] font-mono uppercase text-slate-400">Workers at Risk</div>
+                  <div className="flex items-baseline gap-1 my-1">
+                    <span className={`text-2xl font-black ${state.workersExposed > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                      {state.workersExposed}
+                    </span>
+                    <span className="text-xs text-slate-400 font-mono">/ {state.totalWorkers}</span>
+                  </div>
+                  <div className="text-[10px] text-slate-400 font-mono flex items-center justify-between">
+                    <span>Zone B hazard</span>
+                    <span>👷</span>
+                  </div>
+                </div>
+
+                {/* 6. Primary Alarm Status */}
+                <div className={`glass-card rounded-xl p-3 flex flex-col justify-between border ${
+                  state.primaryAlarmHealth === 'FAILED' ? 'border-red-500/50 bg-red-950/20' : 'border-emerald-500/30'
+                }`}>
+                  <div className="text-[10px] font-mono uppercase text-slate-400">Primary Alarm</div>
+                  <div className="my-1">
+                    <div className={`text-xs font-extrabold truncate ${
+                      state.primaryAlarmHealth === 'FAILED' ? 'text-red-400 animate-pulse' : 'text-emerald-300'
+                    }`}>
+                      {state.primaryAlarmHealth === 'FAILED' ? '❌ FAILED' : '🔔 WORKING'}
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-mono">Relay Verifier</div>
+                  </div>
+                  <div className="text-[10px] text-slate-400 font-mono flex items-center justify-between">
+                    <span>{state.primaryAlarmHealth === 'FAILED' ? 'Fault Detected' : 'Heartbeat OK'}</span>
+                    <span>⚡</span>
+                  </div>
+                </div>
+
+                {/* 7. Backup Alert Status */}
+                <div className="glass-card rounded-xl p-3 flex flex-col justify-between border-cyan-500/30">
+                  <div className="text-[10px] font-mono uppercase text-slate-400">Backup Alert</div>
+                  <div className="my-1">
+                    <div className="text-xs font-extrabold text-cyan-300 truncate">
+                      {state.backupAlertsActive ? '✅ ACTIVATED' : 'STANDBY'}
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-mono">Autonomous Failover</div>
+                  </div>
+                  <div className="text-[10px] text-cyan-400 font-mono flex items-center justify-between">
+                    <span>LoRa + Strobes</span>
+                    <span>📡</span>
+                  </div>
+                </div>
+
+                {/* 8. Equipment Health */}
+                <div className="glass-card rounded-xl p-3 flex flex-col justify-between border-emerald-500/30">
+                  <div className="text-[10px] font-mono uppercase text-slate-400">Equipment Avg</div>
+                  <div className="flex items-baseline gap-1 my-1">
+                    <span className="text-2xl font-black text-emerald-400">78%</span>
+                    <span className="text-xs text-slate-400 font-mono">avg</span>
+                  </div>
+                  <div className="text-[10px] text-amber-300 font-mono flex items-center justify-between">
+                    <span>V-101: 64%</span>
+                    <span>⚙️</span>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* RENDER VIEW ACCORDING TO ACTIVE TAB */}
+              {activeTab === 'dashboard' && (
+                <ViewDashboard 
+                  state={state} 
+                  currentRisk={currentRisk} 
+                  computedResilience={computedResilience}
+                  onSimulateAlarmFail={handleSimulateAlarmFailure}
+                  onOpenXai={(topic) => { setXaiTopic(topic); setIsXaiModalOpen(true); }}
+                  onSelectTab={setActiveTab}
+                />
+              )}
+
+              {activeTab === 'enose' && (
+                <ViewENose 
+                  state={state} 
+                  onToggleFault={handleToggleSensorFault} 
+                  onOpenXai={(topic) => { setXaiTopic(topic); setIsXaiModalOpen(true); }}
+                />
+              )}
+
+              {activeTab === 'risk' && (
+                <ViewRiskPrediction 
+                  state={state} 
+                  currentRisk={currentRisk} 
+                  onOpenXai={(topic) => { setXaiTopic(topic); setIsXaiModalOpen(true); }}
+                />
+              )}
+
+              {activeTab === 'equipment' && (
+                <ViewEquipmentHealth 
+                  state={state} 
+                  setState={setState} 
+                  onOpenXai={(topic) => { setXaiTopic(topic); setIsXaiModalOpen(true); }}
+                />
+              )}
+
+              {activeTab === 'localization' && (
+                <ViewLeakLocalization 
+                  state={state} 
+                  currentRisk={currentRisk} 
+                  onOpenXai={(topic) => { setXaiTopic(topic); setIsXaiModalOpen(true); }}
+                />
+              )}
+
+              {activeTab === 'workers' && (
+                <ViewWorkerSafety 
+                  state={state} 
+                  onOpenXai={(topic) => { setXaiTopic(topic); setIsXaiModalOpen(true); }}
+                />
+              )}
+
+              {activeTab === 'emergency' && (
+                <ViewEmergencyResponse 
+                  state={state} 
+                  onSimulateAlarmFail={handleSimulateAlarmFailure} 
+                  onStartEmergency={handleStartEmergencySimulation}
+                  onOpenXai={(topic) => { setXaiTopic(topic); setIsXaiModalOpen(true); }}
+                />
+              )}
+
+              {activeTab === 'sensors' && (
+                <ViewSensorReliability 
+                  state={state} 
+                  onToggleFault={handleToggleSensorFault} 
+                  onOpenXai={(topic) => { setXaiTopic(topic); setIsXaiModalOpen(true); }}
+                />
+              )}
+
+              {activeTab === 'resilience' && (
+                <ViewResilience 
+                  computedResilience={computedResilience} 
+                  state={state}
+                  onOpenXai={(topic) => { setXaiTopic(topic); setIsXaiModalOpen(true); }}
+                />
+              )}
+
+              {activeTab === 'digitaltwin' && (
+                <ViewDigitalTwin 
+                  state={state} 
+                  onRunScenario={runWhatIfScenario} 
+                  whatIfResults={whatIfResults}
+                  onReset={handleResetSystem}
+                />
+              )}
+
+              {activeTab === 'timeline' && (
+                <ViewFailureChain 
+                  state={state} 
+                  onOpenXai={(topic) => { setXaiTopic(topic); setIsXaiModalOpen(true); }}
+                />
+              )}
+
+              {activeTab === 'incidents' && (
+                <ViewIncidentIntelligence 
+                  state={state} 
+                />
+              )}
+
+              {activeTab === 'xai' && (
+                <ViewExplainableAi 
+                  state={state} 
+                  currentRisk={currentRisk}
+                />
+              )}
+
+            </main>
+          </div>
+
+          {/* ======================================================== */}
+          {/* SIMULATOR CONTROLS SLIDING DRAWER / MODAL               */}
+          {/* ======================================================== */}
+          {isSimDrawerOpen && (
+            <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex justify-end animate-fade-in">
+              <div className="w-full max-w-md bg-cyber-900 border-l border-cyber-700 h-full p-6 overflow-y-auto flex flex-col gap-5 shadow-2xl">
+                <div className="flex items-center justify-between border-b border-cyber-700/60 pb-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">🎛️</span>
+                    <h3 className="text-base font-bold text-white uppercase tracking-wider">Interactive Simulator Controls</h3>
+                  </div>
+                  <button 
+                    onClick={() => setIsSimDrawerOpen(false)}
+                    className="p-1 rounded-lg bg-cyber-800 hover:bg-cyber-700 text-slate-400 hover:text-white"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <p className="text-xs text-slate-400 leading-relaxed font-sans">
+                  Manipulate real-time plant variables to evaluate the system's multi-layer detection, prediction, localization, and failover capabilities.
+                </p>
+
+                {/* Gas Concentration Slider */}
+                <div className="glass-card rounded-xl p-4 flex flex-col gap-2">
+                  <div className="flex justify-between text-xs font-mono">
+                    <span className="text-slate-300">Gas Concentration (PPM)</span>
+                    <span className="text-cyan-400 font-bold">{state.gasConcentration} PPM</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="5"
+                    max="350"
+                    step="1"
+                    value={state.gasConcentration}
+                    onChange={(e) => setState(prev => ({ ...prev, gasConcentration: parseFloat(e.target.value) }))}
+                    className="w-full accent-cyan-500 cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+                    <span>5 PPM (Safe)</span>
+                    <span>25 PPM (OSHA PEL)</span>
+                    <span>300+ PPM (IDLH)</span>
+                  </div>
+                </div>
+
+                {/* Pressure Slider */}
+                <div className="glass-card rounded-xl p-4 flex flex-col gap-2">
+                  <div className="flex justify-between text-xs font-mono">
+                    <span className="text-slate-300">Pipeline Pressure</span>
+                    <span className="text-amber-400 font-bold">{state.pressure} bar</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1.0"
+                    max="5.0"
+                    step="0.05"
+                    value={state.pressure}
+                    onChange={(e) => setState(prev => ({ ...prev, pressure: parseFloat(e.target.value) }))}
+                    className="w-full accent-amber-500 cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+                    <span>1.0 bar</span>
+                    <span>2.2 bar (Nominal)</span>
+                    <span>5.0 bar (Surge)</span>
+                  </div>
+                </div>
+
+                {/* Vibration Slider */}
+                <div className="glass-card rounded-xl p-4 flex flex-col gap-2">
+                  <div className="flex justify-between text-xs font-mono">
+                    <span className="text-slate-300">Compressor & Valve Vibration</span>
+                    <span className="text-red-400 font-bold">{state.vibration} mm/s</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="15.0"
+                    step="0.1"
+                    value={state.vibration}
+                    onChange={(e) => setState(prev => ({ ...prev, vibration: parseFloat(e.target.value) }))}
+                    className="w-full accent-red-500 cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+                    <span>0.5 mm/s (Smooth)</span>
+                    <span>1.4 mm/s</span>
+                    <span>15.0 mm/s (Severe)</span>
+                  </div>
+                </div>
+
+                {/* Temperature Slider */}
+                <div className="glass-card rounded-xl p-4 flex flex-col gap-2">
+                  <div className="flex justify-between text-xs font-mono">
+                    <span className="text-slate-300">Ambient / Process Temperature</span>
+                    <span className="text-orange-400 font-bold">{state.temperature} °C</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="15"
+                    max="75"
+                    step="0.5"
+                    value={state.temperature}
+                    onChange={(e) => setState(prev => ({ ...prev, temperature: parseFloat(e.target.value) }))}
+                    className="w-full accent-orange-500 cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+                    <span>15 °C</span>
+                    <span>24 °C (Ambient)</span>
+                    <span>75 °C (Thermal Runaway)</span>
+                  </div>
+                </div>
+
+                {/* Gas Type Selection */}
+                <div className="glass-card rounded-xl p-4 flex flex-col gap-2">
+                  <label className="text-xs font-mono text-slate-300">Target Gas Signature Profile</label>
+                  <select
+                    value={state.gasType}
+                    onChange={(e) => setState(prev => ({ ...prev, gasType: e.target.value }))}
+                    className="w-full bg-cyber-950 border border-cyber-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
+                  >
+                    <option value="Ammonia (NH₃)">Ammonia (NH₃) - High Toxicity / Fertilizer</option>
+                    <option value="Methane (CH₄)">Methane (CH₄) - Flammable / Hydrocarbon</option>
+                    <option value="Hydrogen Sulfide (H₂S)">Hydrogen Sulfide (H₂S) - Extremely Toxic</option>
+                    <option value="Carbon Monoxide (CO)">Carbon Monoxide (CO) - Asphyxiant</option>
+                    <option value="Volatile Organic Compounds (VOCs)">Volatile Organic Compounds (VOCs)</option>
+                  </select>
+                </div>
+
+                {/* Quick Failure Injections */}
+                <div className="flex flex-col gap-2 pt-2">
+                  <span className="text-xs font-mono uppercase text-slate-400 tracking-wider">Fault Injections</span>
+                  
+                  <button
+                    onClick={handleSimulateAlarmFailure}
+                    className={`w-full py-2.5 px-3 rounded-xl text-xs font-bold border transition-colors flex items-center justify-between ${
+                      state.primaryAlarmHealth === 'FAILED'
+                        ? 'bg-red-600/30 border-red-500 text-red-300'
+                        : 'bg-cyber-800 hover:bg-cyber-700 border-cyber-700 text-slate-300'
+                    }`}
+                  >
+                    <span>⚡ Primary Alarm Failure</span>
+                    <span>{state.primaryAlarmHealth === 'FAILED' ? 'FAILED 🔴' : 'HEALTHY 🟢'}</span>
+                  </button>
+
+                  <button
+                    onClick={handleToggleSensorFault}
+                    className={`w-full py-2.5 px-3 rounded-xl text-xs font-bold border transition-colors flex items-center justify-between ${
+                      state.sensorFaultSimulated
+                        ? 'bg-amber-600/30 border-amber-500 text-amber-300'
+                        : 'bg-cyber-800 hover:bg-cyber-700 border-cyber-700 text-slate-300'
+                    }`}
+                  >
+                    <span>🔬 Sensor S-04 Drift / Fault</span>
+                    <span>{state.sensorFaultSimulated ? 'FAULT 42% ⚠️' : 'NORMAL 92% 🟢'}</span>
+                  </button>
+
+                  <button
+                    onClick={handleSimulateGasLeak}
+                    className="w-full py-2.5 px-3 rounded-xl text-xs font-bold bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/40 text-rose-300 flex items-center justify-between transition-colors"
+                  >
+                    <span>💨 Inject Zone B Ammonia Leak</span>
+                    <span>TRIGGER</span>
+                  </button>
+
+                  <button
+                    onClick={() => setState(prev => ({ ...prev, liveStreamEnabled: !prev.liveStreamEnabled }))}
+                    className={`w-full py-2 px-3 rounded-xl text-xs font-mono border transition-colors flex items-center justify-between ${
+                      state.liveStreamEnabled ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-300' : 'bg-cyber-800 border-cyber-700 text-slate-400'
+                    }`}
+                  >
+                    <span>Sensor Telemetry Live Flutter</span>
+                    <span>{state.liveStreamEnabled ? 'STREAMING 🟢' : 'PAUSED ⏸️'}</span>
+                  </button>
+
+                  <button
+                    onClick={handleResetSystem}
+                    className="w-full mt-2 py-2.5 px-3 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-white border border-slate-600 transition-colors"
+                  >
+                    🔄 Reset All Values to Nominal
+                  </button>
+                </div>
+
+              </div>
+            </div>
+          )}
+
+          {/* ======================================================== */}
+          {/* EXPLAINABLE AI (XAI) MODAL DIALOG                      */}
+          {/* ======================================================== */}
+          {isXaiModalOpen && (
+            <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+              <div className="w-full max-w-2xl bg-cyber-900 border border-cyan-500/40 rounded-2xl p-6 shadow-2xl flex flex-col gap-4">
+                <div className="flex items-center justify-between border-b border-cyber-700/60 pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl text-cyan-400">💡</span>
+                    <div>
+                      <h3 className="text-base font-bold text-white uppercase tracking-wider">Explainable AI (XAI) Transparency</h3>
+                      <p className="text-xs text-slate-400 font-mono">Model: Ensemble XGBoost + Random Forest Feature Attribution</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setIsXaiModalOpen(false)}
+                    className="p-1 rounded-lg bg-cyber-800 hover:bg-cyber-700 text-slate-400 hover:text-white"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="p-4 rounded-xl bg-cyan-950/30 border border-cyan-500/30 text-xs text-cyan-200 leading-relaxed font-sans">
+                  <strong>Why is the system reporting {currentRisk.level.toUpperCase()} Risk?</strong>
+                  <p className="mt-1 text-slate-300">
+                    The predictive inference engine correlates 6 multi-layer continuous variables in real time. Rather than relying on a single trip threshold, the AI calculates a joint probability density based on historical pre-leak signatures.
+                  </p>
+                </div>
+
+                {/* SHAP Feature Weights Breakdown */}
+                <div className="flex flex-col gap-2.5">
+                  <span className="text-xs font-mono uppercase text-slate-400">Feature Importance (SHAP Value Contribution)</span>
+                  
+                  {[
+                    { feature: 'Gas Concentration Gradient (dC/dt)', weight: 38, val: `${state.gasConcentration} PPM`, status: 'Critical', color: 'bg-red-500' },
+                    { feature: 'Process Pressure Variance (dP)', weight: 24, val: `${state.pressure} bar`, status: 'Abnormal', color: 'bg-orange-500' },
+                    { feature: 'Compressor & Valve Vibration FFT', weight: 19, val: `${state.vibration} mm/s`, status: 'Elevated', color: 'bg-amber-500' },
+                    { feature: 'Valve V-101 Health Degradation', weight: 12, val: '64% Health', status: 'Warning', color: 'bg-yellow-500' },
+                    { feature: 'Cross-Sensor Consensus Disparity', weight: 7, val: state.sensorFaultSimulated ? 'Fault in S-04' : 'Nominal', status: 'Inference', color: 'bg-cyan-500' },
+                  ].map((item, idx) => (
+                    <div key={idx} className="flex flex-col gap-1 p-2.5 rounded-lg bg-cyber-950/70 border border-cyber-700/50">
+                      <div className="flex justify-between text-xs font-mono">
+                        <span className="text-white font-semibold">{item.feature}</span>
+                        <span className="text-slate-300">{item.val} &bull; <strong className="text-cyan-400">+{item.weight}%</strong></span>
+                      </div>
+                      <div className="w-full bg-cyber-800 h-2 rounded-full overflow-hidden">
+                        <div className={`h-full ${item.color}`} style={{ width: `${item.weight * 2.2}%` }}></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="p-3 rounded-xl bg-cyber-950 border border-cyber-700 text-xs text-slate-400 font-sans">
+                  <strong>Operator Actionable Directive:</strong>
+                  <p className="mt-0.5 text-slate-300">
+                    "Pre-leak risk elevated due to abnormal concurrent pressure and vibration trends in Zone B. Verify pneumatic actuator packing on Valve V-101 and maintain continuous secondary LoRa alert readiness."
+                  </p>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    onClick={() => setIsXaiModalOpen(false)}
+                    className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold transition-colors"
+                  >
+                    Acknowledge Explanation
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ======================================================== */}
+          {/* FOOTER BAR                                              */}
+          {/* ======================================================== */}
+          <footer className="mt-auto bg-cyber-950/90 border-t border-cyber-700/50 px-4 py-3 text-xs text-slate-400">
+            <div className="max-w-[1780px] mx-auto flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-slate-200">GASGUARD X</span>
+                <span>&bull;</span>
+                <span>AI-Based Multi-Layer Industrial Gas Safety & Leakage Localization System</span>
+              </div>
+              <div className="flex items-center gap-4 font-mono text-[11px]">
+                <span className="text-emerald-400 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  SCADA CORE ACTIVE
+                </span>
+                <span>SIMULATED PROTOTYPE (ACADEMIC / INDUSTRIAL DEMO)</span>
+                <span className="text-slate-400">“Detect. Predict. Verify. Protect.”</span>
+              </div>
+            </div>
+          </footer>
+
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // VIEW 1: DASHBOARD OVERVIEW (COMMAND CENTER)
+    // =========================================================================
+    function ViewDashboard({ state, currentRisk, computedResilience, onSimulateAlarmFail, onOpenXai, onSelectTab }) {
+      return (
+        <div className="flex flex-col gap-4">
+
+          {/* Environmental & Process Live Telemetry Ribbon */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="glass-card rounded-xl p-3.5 flex items-center justify-between border-cyber-700">
+              <div>
+                <div className="text-[10px] font-mono uppercase text-slate-400">Ambient Temperature</div>
+                <div className="text-xl font-bold text-white mt-0.5">{state.temperature} <span className="text-xs text-slate-400 font-mono">°C</span></div>
+                <div className="text-[10px] text-emerald-400 font-mono">Within Safe Threshold (&lt;45°C)</div>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/30 flex items-center justify-center text-lg">
+                🌡️
+              </div>
+            </div>
+
+            <div className="glass-card rounded-xl p-3.5 flex items-center justify-between border-cyber-700">
+              <div>
+                <div className="text-[10px] font-mono uppercase text-slate-400">Pipeline Pressure</div>
+                <div className="text-xl font-bold text-white mt-0.5">{state.pressure} <span className="text-xs text-slate-400 font-mono">bar</span></div>
+                <div className={`text-[10px] font-mono ${state.pressure > 3.0 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                  {state.pressure > 3.0 ? 'Elevated Pressure' : 'Normal Operating Range'}
+                </div>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-lg">
+                ⏲️
+              </div>
+            </div>
+
+            <div className="glass-card rounded-xl p-3.5 flex items-center justify-between border-cyber-700">
+              <div>
+                <div className="text-[10px] font-mono uppercase text-slate-400">Main Process Flow Rate</div>
+                <div className="text-xl font-bold text-white mt-0.5">{state.flowRate} <span className="text-xs text-slate-400 font-mono">m³/h</span></div>
+                <div className="text-[10px] text-cyan-400 font-mono">Corridor Velocity Nominal</div>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-lg">
+                💨
+              </div>
+            </div>
+
+            <div className="glass-card rounded-xl p-3.5 flex items-center justify-between border-cyber-700">
+              <div>
+                <div className="text-[10px] font-mono uppercase text-slate-400">Equipment Vibration</div>
+                <div className="text-xl font-bold text-white mt-0.5">{state.vibration} <span className="text-xs text-slate-400 font-mono">mm/s</span></div>
+                <div className={`text-[10px] font-mono ${state.vibration > 3.5 ? 'text-red-400 font-bold' : 'text-emerald-400'}`}>
+                  {state.vibration > 3.5 ? 'Abnormal Vibration (V-101)' : 'Harmonic Baseline Nominal'}
+                </div>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center justify-center text-lg">
+                📊
+              </div>
+            </div>
+          </div>
+
+          {/* MAIN DUAL SPLIT: FACTORY FLOOR RISK MAP & RESILIENCE SCORE HUD */}
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+            
+            {/* LEFT: 2D Interactive Dynamic Risk & Floor Map (7 cols) */}
+            <div className="xl:col-span-7 flex flex-col">
+              <div className="glass-card rounded-2xl p-4 flex-1 flex flex-col border-cyan-500/20 shadow-xl">
+                <div className="flex items-center justify-between border-b border-cyber-700/60 pb-3 mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-cyan-400 text-lg">🗺️</span>
+                    <div>
+                      <h3 className="text-sm font-bold text-white uppercase tracking-wider">Dynamic Factory Risk Map (Floor Plan)</h3>
+                      <p className="text-xs text-slate-400 font-mono">Real-time localized gas spread, worker telemetry & evacuation routes</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-1 rounded bg-red-500/20 text-red-400 border border-red-500/40 text-xs font-mono font-bold animate-pulse">
+                      Probable Leak: {state.probableLeakZone} ({state.leakConfidence}%)
+                    </span>
+                    <button
+                      onClick={() => onSelectTab('localization')}
+                      className="text-xs text-cyan-400 hover:text-cyan-300 font-mono underline"
+                    >
+                      Enlarge Map &rarr;
+                    </button>
+                  </div>
+                </div>
+
+                {/* SVG Factory Floor Component */}
+                <div className="flex-1 w-full min-h-[360px] bg-cyber-950/90 rounded-xl border border-cyber-700/60 relative overflow-hidden flex items-center justify-center p-2">
+                  <FactoryFloorMapSvg state={state} currentRisk={currentRisk} />
+                </div>
+
+                {/* Floor Map Legend */}
+                <div className="flex flex-wrap items-center justify-between gap-3 mt-3 pt-3 border-t border-cyber-700/40 text-[11px] font-mono text-slate-400">
+                  <div className="flex items-center gap-3">
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Safe Zone</span>
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Warning Zone</span>
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-orange-500"></span> High Risk</span>
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping"></span> Critical Plume</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-300">
+                    <span>Airflow: <strong>{state.airflow.direction}</strong> ({state.airflow.speed} m/s)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT: SAFETY RESILIENCE SCORE & PRE-LEAK RISK (5 cols) */}
+            <div className="xl:col-span-5 flex flex-col gap-4">
+              
+              {/* Circular Safety Resilience Score Card */}
+              <div className="glass-card rounded-2xl p-4 flex flex-col border-indigo-500/30 shadow-xl">
+                <div className="flex items-center justify-between border-b border-cyber-700/60 pb-2.5 mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-indigo-400 text-lg">🛡️</span>
+                    <div>
+                      <h3 className="text-sm font-bold text-white uppercase tracking-wider">Safety Resilience Score</h3>
+                      <p className="text-xs text-slate-400 font-mono">Multi-Layer Defensive Integrity</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => onOpenXai('resilience')}
+                    className="text-xs text-indigo-400 hover:text-indigo-300 font-mono underline"
+                  >
+                    View Breakdown &rarr;
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-around py-2">
+                  {/* Large Circular Gauge SVG */}
+                  <div className="relative w-36 h-36 flex items-center justify-center">
+                    <svg className="w-full h-full transform -rotate-90" viewBox="0 0 120 120">
+                      <circle cx="60" cy="60" r="50" stroke="#1e2b4f" strokeWidth="10" fill="transparent" />
+                      <circle
+                        cx="60"
+                        cy="60"
+                        r="50"
+                        stroke="#6366f1"
+                        strokeWidth="10"
+                        strokeDasharray={2 * Math.PI * 50}
+                        strokeDashoffset={2 * Math.PI * 50 * (1 - computedResilience.total / 100)}
+                        strokeLinecap="round"
+                        fill="transparent"
+                        className="transition-all duration-1000"
+                      />
+                    </svg>
+                    <div className="absolute flex flex-col items-center justify-center text-center">
+                      <span className="text-3xl font-black text-white">{computedResilience.total}</span>
+                      <span className="text-[10px] text-slate-400 font-mono uppercase tracking-widest">/ 100</span>
+                      <span className="text-[9px] font-bold text-indigo-300 uppercase mt-0.5">RESILIENT</span>
+                    </div>
+                  </div>
+
+                  {/* Weakest Layer Alert Box */}
+                  <div className="flex flex-col gap-1.5 max-w-[200px]">
+                    <div className="text-[11px] font-mono text-slate-400 uppercase">Defensive Status</div>
+                    <div className="text-sm font-bold text-indigo-200">
+                      {computedResilience.total >= 75 ? 'Defense In Depth Active' : 'Degraded Safety Margin'}
+                    </div>
+                    <div className="p-2 rounded-lg bg-cyber-950 border border-cyber-700/80 text-[11px] text-slate-300 font-sans mt-1">
+                      <div className="text-amber-400 font-bold font-mono text-[10px] uppercase">Weakest Layer:</div>
+                      Equipment Health (Valve V-101 at 64%). Vibration mitigation recommended.
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sub-Layer Mini Progress Bars */}
+                <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-cyber-700/50">
+                  {computedResilience.layers.map((layer, idx) => (
+                    <div key={idx} className="p-2 rounded-lg bg-cyber-950/60 border border-cyber-800 flex flex-col gap-1">
+                      <div className="flex justify-between text-[11px] font-mono">
+                        <span className="text-slate-300">{layer.name}</span>
+                        <span className={`font-bold ${layer.score < 70 ? 'text-amber-400' : 'text-cyan-400'}`}>{layer.score}%</span>
+                      </div>
+                      <div className="w-full bg-cyber-800 h-1.5 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full ${layer.score < 70 ? 'bg-amber-500' : 'bg-cyan-500'}`} 
+                          style={{ width: `${layer.score}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Pre-Leak Prediction Quick Panel */}
+              <div className="glass-card rounded-2xl p-4 flex flex-col border-cyber-700 shadow-xl">
+                <div className="flex items-center justify-between border-b border-cyber-700/60 pb-2 mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-amber-400 text-lg">📈</span>
+                    <div>
+                      <h4 className="text-sm font-bold text-white uppercase tracking-wider">AI Pre-Leak Prediction</h4>
+                      <p className="text-xs text-slate-400 font-mono">Multi-parameter early warning</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => onOpenXai('risk')}
+                    className="text-xs text-amber-400 hover:text-amber-300 font-mono underline"
+                  >
+                    Why? (XAI)
+                  </button>
+                </div>
+
+                <div className="p-3 rounded-xl bg-amber-950/20 border border-amber-500/30 text-xs text-amber-200 font-mono">
+                  “Risk increasing due to abnormal pressure ({state.pressure} bar), vibration ({state.vibration} mm/s) and gas concentration ({state.gasConcentration} PPM) trends.”
+                </div>
+
+                <div className="flex items-center justify-between mt-3 text-xs font-mono">
+                  <span className="text-slate-400">Predicted Risk Probability:</span>
+                  <span className="text-lg font-black text-amber-300">87%</span>
+                </div>
+                <div className="w-full bg-cyber-950 h-2 rounded-full overflow-hidden border border-cyber-700 mt-1">
+                  <div className="bg-gradient-to-r from-amber-500 to-red-500 h-full" style={{ width: '87%' }}></div>
+                </div>
+
+                <div className="flex items-center justify-between mt-3 pt-2 border-t border-cyber-700/40 text-[11px] text-slate-400">
+                  <span>Estimated Lead Time: <strong className="text-white">18 mins to critical breach</strong></span>
+                  <button 
+                    onClick={() => onSelectTab('risk')}
+                    className="text-cyan-400 hover:underline"
+                  >
+                    Full Analytics &rarr;
+                  </button>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+
+          {/* LOWER ROW: MULTI-LAYER EMERGENCY ALERTS & EQUIPMENT STATUS */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            
+            {/* 7-Layer Redundant Emergency Alert Matrix (Feature 8 & 9) */}
+            <div className="glass-card rounded-2xl p-4 flex flex-col border-cyber-700 shadow-xl">
+              <div className="flex items-center justify-between border-b border-cyber-700/60 pb-3 mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-red-400 text-lg">🚨</span>
+                  <div>
+                    <h3 className="text-sm font-bold text-white uppercase tracking-wider">Multi-Layer Emergency Alerts</h3>
+                    <p className="text-xs text-slate-400 font-mono">Never rely solely on a single siren</p>
+                  </div>
+                </div>
+                <button
+                  onClick={onSimulateAlarmFail}
+                  className="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-mono font-bold transition-colors"
+                >
+                  ⚡ Toggle Alarm Fail
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {state.safetyLayers.map((layer) => (
+                  <div 
+                    key={layer.id} 
+                    className={`p-2.5 rounded-xl border flex items-center justify-between ${
+                      layer.status === 'FAILED'
+                        ? 'bg-red-950/30 border-red-500/60 text-red-200'
+                        : layer.status === 'ACTIVE'
+                        ? 'bg-cyber-950/80 border-cyan-500/30 text-cyan-200'
+                        : 'bg-cyber-950/40 border-cyber-800 text-slate-400'
+                    }`}
+                  >
+                    <div>
+                      <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                        <span className={`w-2 h-2 rounded-full ${
+                          layer.status === 'FAILED' ? 'bg-red-500 animate-ping' : layer.status === 'ACTIVE' ? 'bg-cyan-400' : 'bg-slate-500'
+                        }`}></span>
+                        {layer.name}
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-mono mt-0.5">{layer.type}</div>
+                    </div>
+                    <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${
+                      layer.status === 'FAILED'
+                        ? 'bg-red-500/30 text-red-300 border-red-500'
+                        : layer.status === 'ACTIVE'
+                        ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
+                        : 'bg-slate-800 text-slate-400 border-slate-700'
+                    }`}>
+                      {layer.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-3 p-2.5 rounded-xl bg-cyber-950/80 border border-cyber-700/60 text-xs text-slate-300 font-sans flex items-center justify-between">
+                <span>Primary Alarm Heartbeat: <strong className={state.primaryAlarmHealth === 'FAILED' ? 'text-red-400' : 'text-emerald-400'}>{state.primaryAlarmHealth}</strong></span>
+                <span className="text-cyan-400 font-mono text-[11px]">Failover Latency: &lt;120ms</span>
+              </div>
+            </div>
+
+            {/* Quick Equipment Health Cards (Feature 4) */}
+            <div className="glass-card rounded-2xl p-4 flex flex-col border-cyber-700 shadow-xl">
+              <div className="flex items-center justify-between border-b border-cyber-700/60 pb-3 mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-emerald-400 text-lg">⚙️</span>
+                  <div>
+                    <h3 className="text-sm font-bold text-white uppercase tracking-wider">Critical Equipment Status</h3>
+                    <p className="text-xs text-slate-400 font-mono">Real-time asset telemetry & predictive health</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => onSelectTab('equipment')}
+                  className="text-xs text-emerald-400 hover:text-emerald-300 font-mono underline"
+                >
+                  All 5 Assets &rarr;
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                {state.equipment.slice(0, 3).map((item) => (
+                  <div key={item.id} className="p-3 rounded-xl bg-cyber-950/80 border border-cyber-700/70 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-mono font-bold text-sm border ${
+                        item.health < 70 ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                      }`}>
+                        {item.id}
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-white">{item.name}</div>
+                        <div className="text-[10px] text-slate-400 font-mono">{item.abnormality}</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className={`text-base font-black ${item.health < 70 ? 'text-amber-400' : 'text-emerald-400'}`}>{item.health}%</div>
+                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                        item.status === 'Attention Required'
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                          : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                      }`}>
+                        {item.status}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-3 p-2.5 rounded-xl bg-cyber-950/80 border border-cyber-700/60 text-xs text-slate-400 font-sans flex items-center justify-between">
+                <span>Valve V-101 Gland Packing Rec: <strong className="text-amber-300">Overhaul in 48h</strong></span>
+                <span className="text-cyan-400 font-mono text-[11px]">ISO 10816 Vibration Class-II</span>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // VIEW 2: E-NOSE GAS DETECTION (5 VIRTUAL SENSORS & AI CLASSIFICATION)
+    // =========================================================================
+    function ViewENose({ state, onToggleFault, onOpenXai }) {
+      return (
+        <div className="flex flex-col gap-4">
+          
+          {/* CRITICAL EXPLANATION BANNER (Prompt Requirement 2) */}
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-950 via-cyber-900 to-indigo-950 border border-cyan-500/40 shadow-xl flex items-start gap-3">
+            <span className="text-2xl mt-0.5">ℹ️</span>
+            <div className="text-xs text-slate-300 leading-relaxed font-sans">
+              <strong className="text-cyan-300 text-sm block mb-1">
+                E-NOSE OPERATING PRINCIPLE &bull; AI MULTI-SENSOR PATTERN RECOGNITION
+              </strong>
+              The Electronic Nose (E-Nose) does <strong className="text-white">not work like a biological human nose</strong>. It operates using an array of 5 distinct chemical sensors with cross-reactive surface affinities. When target vapor molecules adsorb onto the sensor surfaces, resistance profiles shift across all 5 channels simultaneously. An AI machine learning classifier (multivariate pattern recognition) compares this dynamic fingerprint against learned chemical signatures to classify the gas species and quantify PPM concentration.
+            </div>
+          </div>
+
+          {/* AI Gas Classification Hero Card */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            
+            {/* Left: AI Classification Result */}
+            <div className="lg:col-span-5 glass-card rounded-2xl p-5 flex flex-col justify-between border-cyan-500/40 shadow-xl">
+              <div>
+                <div className="flex items-center justify-between border-b border-cyber-700/60 pb-3 mb-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">🔬</span>
+                    <div>
+                      <h3 className="text-sm font-bold text-white uppercase tracking-wider">AI Classification Output</h3>
+                      <p className="text-xs text-slate-400 font-mono">Neural Pattern Matcher</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => onOpenXai('enose')}
+                    className="text-xs text-cyan-400 hover:text-cyan-300 font-mono underline"
+                  >
+                    Why? (XAI)
+                  </button>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  <div>
+                    <span className="text-xs font-mono text-slate-400 uppercase">Detected Gas Species</span>
+                    <div className="text-3xl font-black text-cyan-300 mt-0.5 flex items-center gap-2">
+                      <span>{state.gasType}</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 py-2">
+                    <div className="p-3 rounded-xl bg-cyber-950 border border-cyber-700">
+                      <div className="text-[10px] font-mono text-slate-400 uppercase">Confidence Score</div>
+                      <div className="text-2xl font-black text-emerald-400 mt-1">92%</div>
+                      <div className="text-[10px] text-slate-400 font-mono mt-0.5">Cosine Sim: 0.942</div>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-cyber-950 border border-cyber-700">
+                      <div className="text-[10px] font-mono text-slate-400 uppercase">Concentration</div>
+                      <div className="text-2xl font-black text-white mt-1">{state.gasConcentration} <span className="text-xs text-slate-400">PPM</span></div>
+                      <div className="text-[10px] text-amber-400 font-mono mt-0.5">&gt; OSHA PEL (25 PPM)</div>
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-cyber-950/70 border border-cyber-700 text-xs text-slate-300 font-mono flex flex-col gap-1">
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Signature Match:</span>
+                      <strong className="text-cyan-400">Ammonia Type-IV Fingerprint</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Risk Assessment:</span>
+                      <strong className="text-red-400">Critical Toxic Exposure Hazard</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-cyber-700/60 flex items-center justify-between text-xs font-mono text-slate-400">
+                <span>Model: Support Vector Ensemble</span>
+                <span>Response Time: 1.8s</span>
+              </div>
+            </div>
+
+            {/* Right: E-Nose Radar Signature Chart & Channel Visualizer */}
+            <div className="lg:col-span-7 glass-card rounded-2xl p-5 flex flex-col border-cyber-700 shadow-xl">
+              <div className="flex items-center justify-between border-b border-cyber-700/60 pb-3 mb-4">
+                <div>
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider">Multi-Channel Chemical Signature Pattern</h3>
+                  <p className="text-xs text-slate-400 font-mono">Radar footprint comparison vs pure Ammonia benchmark</p>
+                </div>
+                <button
+                  onClick={onToggleFault}
+                  className="px-3 py-1 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-mono font-bold hover:bg-amber-500/30 transition-colors"
+                >
+                  {state.sensorFaultSimulated ? 'Restore S-04' : 'Simulate S-04 Fault'}
+                </button>
+              </div>
+
+              {/* Dynamic Radar Visualization (SVG) */}
+              <div className="flex-1 min-h-[240px] flex items-center justify-center p-2">
+                <RadarSignatureSvg sensors={state.sensors} />
+              </div>
+
+              <div className="flex items-center justify-around text-xs font-mono text-slate-400 pt-2 border-t border-cyber-700/40">
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-cyan-400"></span> Live Sensor Array Footprint</span>
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-slate-500"></span> Calibrated Baseline (Zero Gas)</span>
+              </div>
+            </div>
+
+          </div>
+
+          {/* 5 VIRTUAL SENSOR CARDS */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            {state.sensors.map((sensor) => (
+              <div 
+                key={sensor.id}
+                className={`glass-card rounded-2xl p-4 flex flex-col justify-between border transition-all ${
+                  sensor.status !== 'Normal' ? 'border-amber-500/60 bg-amber-950/20' : 'border-cyber-700/60'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-mono font-extrabold text-cyan-400">{sensor.code}</span>
+                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                      sensor.status === 'Normal' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border-amber-500/40 animate-pulse'
+                    }`}>
+                      {sensor.status === 'Normal' ? '96% Trust' : '42% Trust (Fault)'}
+                    </span>
+                  </div>
+
+                  <h4 className="text-xs font-bold text-white leading-snug">{sensor.name}</h4>
+                  <p className="text-[10px] text-slate-400 mt-1 line-clamp-2">{sensor.desc}</p>
+
+                  <div className="my-3 p-2.5 rounded-xl bg-cyber-950 border border-cyber-800 flex items-baseline justify-between">
+                    <div>
+                      <div className="text-[9px] font-mono text-slate-400 uppercase">Normalized Reading</div>
+                      <div className="text-lg font-black text-white">{sensor.reading} <span className="text-[10px] text-slate-400">Ω</span></div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[9px] font-mono text-slate-400 uppercase">Delta Baseline</div>
+                      <div className="text-xs font-mono text-cyan-400 font-bold">+{sensor.reading - sensor.baseline}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="w-full bg-cyber-950 h-1.5 rounded-full overflow-hidden border border-cyber-800">
+                  <div 
+                    className={`h-full ${sensor.status === 'Normal' ? 'bg-cyan-500' : 'bg-amber-500'}`} 
+                    style={{ width: `${Math.min(100, (sensor.reading / 250) * 100)}%` }}
+                  ></div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // VIEW 3: PRE-LEAK RISK PREDICTION (MULTI-VARIATE ANALYTICS & TREND)
+    // =========================================================================
+    function ViewRiskPrediction({ state, currentRisk, onOpenXai }) {
+      return (
+        <div className="flex flex-col gap-4">
+          
+          {/* Prediction Hero Panel */}
+          <div className="glass-card rounded-2xl p-5 border-amber-500/40 shadow-xl flex flex-col lg:flex-row items-center justify-between gap-6">
+            <div className="flex-1 flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">⚡</span>
+                <h3 className="text-base font-extrabold text-white uppercase tracking-wider">
+                  AI Pre-Leak Risk Inference Engine
+                </h3>
+                <span className="text-xs font-mono px-2.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold">
+                  PREDICTED: {currentRisk.level.toUpperCase()}
+                </span>
+              </div>
+              
+              <p className="text-xs text-amber-200/90 font-mono leading-relaxed bg-amber-950/30 p-3 rounded-xl border border-amber-500/30">
+                “Risk increasing due to abnormal pressure ({state.pressure} bar), vibration ({state.vibration} mm/s) and gas concentration ({state.gasConcentration} PPM) trends.”
+              </p>
+
+              <div className="flex items-center gap-4 text-xs font-mono text-slate-300 mt-1">
+                <span>Model Confidence: <strong className="text-white">87% Probability</strong></span>
+                <span>Lead Time to Breach: <strong className="text-amber-400">~18 minutes</strong></span>
+                <span>False-Positive Rejection: <strong className="text-emerald-400">99.4%</strong></span>
+              </div>
+            </div>
+
+            <div className="flex flex-col items-center justify-center p-4 rounded-xl bg-cyber-950 border border-cyber-700 min-w-[180px]">
+              <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">Risk Probability</span>
+              <span className="text-4xl font-black text-amber-400 my-1">87%</span>
+              <span className="text-[10px] font-mono text-red-400 font-bold">HIGH PREVENTIVE PRIORITY</span>
+            </div>
+          </div>
+
+          {/* Time Series Trend Graph (SVG) */}
+          <div className="glass-card rounded-2xl p-5 border-cyber-700 shadow-xl flex flex-col gap-3">
+            <div className="flex items-center justify-between border-b border-cyber-700/60 pb-3">
+              <div>
+                <h4 className="text-sm font-bold text-white uppercase tracking-wider">Multi-Parametric Risk Progression Over Time</h4>
+                <p className="text-xs text-slate-400 font-mono">60-Minute retrospective time window vs predictive forecast</p>
+              </div>
+              <button 
+                onClick={() => onOpenXai('risk')}
+                className="px-3 py-1 rounded bg-cyber-800 hover:bg-cyber-700 text-xs text-cyan-300 border border-cyber-700 font-mono"
+              >
+                View SHAP Explanation
+              </button>
+            </div>
+
+            <div className="w-full h-64 bg-cyber-950/80 rounded-xl border border-cyber-800 p-2 flex items-center justify-center">
+              <RiskTrendLineSvg currentRisk={currentRisk.score} />
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono text-slate-400 pt-2 border-t border-cyber-700/40">
+              <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Normal Baseline (&lt;40%)</div>
+              <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Warning Corridor (40-65%)</div>
+              <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-orange-500"></span> High Risk Window (65-80%)</div>
+              <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-red-500"></span> Critical Rupture (&gt;80%)</div>
+            </div>
+          </div>
+
+          {/* Correlated Variables Diagnostic Breakdown */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="glass-card rounded-xl p-4 border-cyber-700">
+              <div className="text-xs font-mono text-slate-400 uppercase">Mechanical Stress Index</div>
+              <div className="text-xl font-bold text-white mt-1">{state.vibration} mm/s &bull; {state.pressure} bar</div>
+              <p className="text-xs text-slate-400 mt-2">
+                Coupled mechanical vibration and pressure flutter exceed ISO 10816-3 Category-C limits, causing micro-seal wear on Valve V-101.
+              </p>
+            </div>
+
+            <div className="glass-card rounded-xl p-4 border-cyber-700">
+              <div className="text-xs font-mono text-slate-400 uppercase">Vapor Dispersion Velocity</div>
+              <div className="text-xl font-bold text-white mt-1">{state.airflow.speed} m/s ({state.airflow.direction})</div>
+              <p className="text-xs text-slate-400 mt-2">
+                Simulated HVAC exhaust velocity confirms north-east plume vectoring towards Corridor Zone C.
+              </p>
+            </div>
+
+            <div className="glass-card rounded-xl p-4 border-cyber-700">
+              <div className="text-xs font-mono text-slate-400 uppercase">Ensemble Classification</div>
+              <div className="text-xl font-bold text-cyan-300 mt-1">XGBoost + Random Forest</div>
+              <p className="text-xs text-slate-400 mt-2">
+                Trained on 45,000 synthetic multi-fault operating points with 99.1% F1-score localization accuracy.
+              </p>
+            </div>
+          </div>
+
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // VIEW 4: EQUIPMENT HEALTH MONITORING (5 MONITORED ASSETS)
+    // =========================================================================
+    function ViewEquipmentHealth({ state, setState, onOpenXai }) {
+      const toggleAssetFailure = (assetId) => {
+        sound.playClick();
+        setState(prev => ({
+          ...prev,
+          equipment: prev.equipment.map(e => {
+            if (e.id === assetId) {
+              const newFailed = !e.isFailed;
+              return {
+                ...e,
+                isFailed: newFailed,
+                health: newFailed ? 28 : 88,
+                status: newFailed ? 'Critical Fault' : 'Nominal',
+                abnormality: newFailed ? 'Severe seal breach & high thermal vibration' : 'Nominal acoustic baseline',
+              };
+            }
+            return e;
+          })
+        }));
+      };
+
+      return (
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h3 className="text-base font-bold text-white uppercase tracking-wider">Industrial Equipment Health Monitoring</h3>
+              <p className="text-xs text-slate-400 font-mono">Vibration, thermal fatigue, acoustic emission & seal integrity</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono text-slate-300">5 Monitored Critical Assets</span>
+            </div>
+          </div>
+
+          {/* 5 Equipment Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {state.equipment.map((item) => (
+              <div 
+                key={item.id}
+                className={`glass-card rounded-2xl p-5 border flex flex-col justify-between transition-all ${
+                  item.health < 70 ? 'border-amber-500/50 bg-amber-950/20' : 'border-cyber-700/60'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2.5">
+                      <span className="px-2.5 py-1 rounded-lg bg-cyber-950 border border-cyber-700 font-mono font-bold text-xs text-cyan-300">
+                        {item.id}
+                      </span>
+                      <span className="text-xs font-mono text-slate-400">{item.zone}</span>
+                    </div>
+                    <span className={`text-[10px] font-mono font-bold px-2.5 py-1 rounded border ${
+                      item.status === 'Nominal'
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                        : item.status === 'Critical Fault'
+                        ? 'bg-red-500/20 text-red-300 border-red-500/40 animate-pulse'
+                        : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                    }`}>
+                      {item.status}
+                    </span>
+                  </div>
+
+                  <h4 className="text-sm font-bold text-white">{item.name}</h4>
+                  <div className="text-xs text-slate-400 font-mono mt-0.5">Category: {item.type}</div>
+
+                  {/* Health Score Meter */}
+                  <div className="my-4">
+                    <div className="flex justify-between text-xs font-mono mb-1">
+                      <span className="text-slate-400">Health Score</span>
+                      <span className={`font-black ${item.health < 70 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                        {item.health}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-cyber-950 h-2 rounded-full overflow-hidden border border-cyber-800">
+                      <div 
+                        className={`h-full ${item.health < 70 ? 'bg-amber-500' : 'bg-emerald-500'}`} 
+                        style={{ width: `${item.health}%` }}
+                      ></div>
+                    </div>
+                  </div>
+
+                  {/* Abnormality Detected */}
+                  <div className="p-3 rounded-xl bg-cyber-950/80 border border-cyber-800 text-xs flex flex-col gap-1 mb-3">
+                    <span className="text-[10px] font-mono uppercase text-slate-400 font-bold">Abnormality Detected</span>
+                    <span className="text-amber-300 font-sans">{item.abnormality}</span>
+                  </div>
+
+                  {/* Maintenance Recommendation */}
+                  <div className="p-3 rounded-xl bg-cyber-950/80 border border-cyber-800 text-xs flex flex-col gap-1">
+                    <span className="text-[10px] font-mono uppercase text-slate-400 font-bold">Maintenance Recommendation</span>
+                    <span className="text-slate-300 font-sans">{item.rec}</span>
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-cyber-700/60 flex items-center justify-between">
+                  <button
+                    onClick={() => onOpenXai('equipment')}
+                    className="text-xs text-cyan-400 hover:text-cyan-300 font-mono underline"
+                  >
+                    Asset Diagnostics &rarr;
+                  </button>
+                  <button
+                    onClick={() => toggleAssetFailure(item.id)}
+                    className="px-2.5 py-1 rounded bg-cyber-800 hover:bg-cyber-700 text-[11px] font-mono text-slate-300 border border-cyber-700 transition-colors"
+                  >
+                    {item.isFailed ? 'Restore Nominal' : 'Simulate Fault'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // VIEW 5: LEAKAGE LOCALIZATION & DYNAMIC RISK MAP
+    // =========================================================================
+    function ViewLeakLocalization({ state, currentRisk, onOpenXai }) {
+      return (
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h3 className="text-base font-bold text-white uppercase tracking-wider">Dynamic Leakage Localization & Gas Plume Propagation</h3>
+              <p className="text-xs text-slate-400 font-mono">Gradient trilateration, dispersion modelling & wind-vector compensation</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="px-3 py-1 rounded bg-red-500/20 text-red-300 border border-red-500/40 text-xs font-mono font-bold animate-pulse">
+                PROBABLE LEAK ZONE: {state.probableLeakZone} ({state.leakConfidence}%)
+              </span>
+            </div>
+          </div>
+
+          {/* Large Factory Floor Map */}
+          <div className="glass-card rounded-2xl p-5 border-cyber-700 shadow-xl flex flex-col gap-3">
+            <div className="flex items-center justify-between border-b border-cyber-700/60 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">🗺️</span>
+                <span className="text-xs font-mono text-slate-300">Full Scale Plan: Chemical Plant Complex Sector-4</span>
+              </div>
+              <div className="flex items-center gap-3 text-xs font-mono text-slate-400">
+                <span>Airflow: <strong className="text-white">{state.airflow.direction}</strong></span>
+                <span>Speed: <strong className="text-white">{state.airflow.speed} m/s</strong></span>
+              </div>
+            </div>
+
+            <div className="w-full min-h-[460px] bg-cyber-950/90 rounded-xl border border-cyber-700/60 relative overflow-hidden flex items-center justify-center p-3">
+              <FactoryFloorMapSvg state={state} currentRisk={currentRisk} large={true} />
+            </div>
+          </div>
+
+          {/* 4 Zone Detailed Breakdown Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {Object.entries(state.zones).map(([zoneKey, z]) => (
+              <div key={zoneKey} className={`glass-card rounded-2xl p-4 border flex flex-col justify-between ${
+                z.riskLevel === 'Critical' || z.riskLevel === 'High Risk'
+                  ? 'border-red-500/50 bg-red-950/20'
+                  : z.riskLevel === 'Warning'
+                  ? 'border-amber-500/40'
+                  : 'border-cyber-700/60'
+              }`}>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-extrabold text-white">{zoneKey}</span>
+                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                      z.riskLevel === 'Critical' || z.riskLevel === 'High Risk'
+                        ? 'bg-red-500/20 text-red-300 border-red-500/40 animate-pulse'
+                        : z.riskLevel === 'Warning'
+                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                        : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                    }`}>
+                      {z.riskLevel}
+                    </span>
+                  </div>
+
+                  <div className="text-xs text-slate-400 mb-3">{z.name}</div>
+
+                  <div className="space-y-1.5 text-xs font-mono">
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Local Gas:</span>
+                      <strong className="text-white">{z.gasPpm} PPM</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Ambient Temp:</span>
+                      <strong className="text-white">{z.temp} °C</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Workers Assigned:</span>
+                      <strong className={z.workers > 0 && z.riskLevel !== 'Normal' ? 'text-red-400' : 'text-slate-300'}>{z.workers}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-3 pt-2 border-t border-cyber-700/50 text-[11px] font-mono text-cyan-400">
+                  {zoneKey === state.probableLeakZone ? '⚠️ Centroid of Max Vapor Gradient' : 'Boundary Buffer'}
+                </div>
+              </div>
+            ))}
+          </div>
+
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // VIEW 6: WORKER SAFETY & EXPOSURE PREDICTION
+    // =========================================================================
+    function ViewWorkerSafety({ state, onOpenXai }) {
+      return (
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h3 className="text-base font-bold text-white uppercase tracking-wider">Worker Safety & Exposure Prediction</h3>
+              <p className="text-xs text-slate-400 font-mono">OSHA TWA dosage, wearable LoRa telemetry & dynamic evacuation dispatch</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="px-3 py-1 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40 text-xs font-mono font-bold">
+                Total Personnel Monitored: {state.totalWorkers}
+              </span>
+            </div>
+          </div>
+
+          {/* Exposure Summary Counters */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="glass-card rounded-xl p-4 border-emerald-500/30">
+              <div className="text-xs font-mono text-slate-400 uppercase">Workers in Safe Zones</div>
+              <div className="text-3xl font-black text-emerald-400 mt-1">{state.workersSafe}</div>
+              <div className="text-[10px] text-slate-400 font-mono mt-0.5">Assigned to Zone A & D</div>
+            </div>
+
+            <div className="glass-card rounded-xl p-4 border-amber-500/30">
+              <div className="text-xs font-mono text-slate-400 uppercase">Near Risk Perimeter</div>
+              <div className="text-3xl font-black text-amber-400 mt-1">{state.workersNearRisk}</div>
+              <div className="text-[10px] text-slate-400 font-mono mt-0.5">Corridor Buffer Zone C</div>
+            </div>
+
+            <div className="glass-card rounded-xl p-4 border-red-500/50 bg-red-950/20">
+              <div className="text-xs font-mono text-slate-400 uppercase">Potentially Exposed</div>
+              <div className="text-3xl font-black text-red-400 mt-1 animate-pulse">{state.workersExposed}</div>
+              <div className="text-[10px] text-red-300 font-mono mt-0.5">Active in Zone B (Critical)</div>
+            </div>
+
+            <div className="glass-card rounded-xl p-4 border-cyan-500/30">
+              <div className="text-xs font-mono text-slate-400 uppercase">Wearables Active</div>
+              <div className="text-3xl font-black text-cyan-400 mt-1">100%</div>
+              <div className="text-[10px] text-cyan-300 font-mono mt-0.5">LoRa Badges Online</div>
+            </div>
+          </div>
+
+          {/* Dynamic Evacuation Directive Banner */}
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-red-950/70 via-cyber-900 to-amber-950/60 border border-red-500/50 shadow-xl flex items-start gap-3">
+            <span className="text-2xl mt-0.5">📢</span>
+            <div className="text-xs text-slate-200 leading-relaxed font-sans">
+              <strong className="text-red-300 text-sm block mb-1">
+                AUTOMATED EVACUATION RECOMMENDATION &bull; DISPATCH DIRECTIVE
+              </strong>
+              {state.evacuationRecommendation}
+            </div>
+          </div>
+
+          {/* Personnel Table */}
+          <div className="glass-card rounded-2xl p-5 border-cyber-700 shadow-xl">
+            <div className="text-sm font-bold text-white uppercase tracking-wider mb-3">Live Personnel Telemetry Roster</div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs font-mono text-left">
+                <thead className="bg-cyber-950 border-b border-cyber-700 text-slate-400 uppercase text-[10px]">
+                  <tr>
+                    <th className="py-2.5 px-3">Worker ID</th>
+                    <th className="py-2.5 px-3">Name</th>
+                    <th className="py-2.5 px-3">Role</th>
+                    <th className="py-2.5 px-3">Location Zone</th>
+                    <th className="py-2.5 px-3">Dosimeter (PPM)</th>
+                    <th className="py-2.5 px-3">Heart Rate</th>
+                    <th className="py-2.5 px-3">Wearable Alert Status</th>
+                    <th className="py-2.5 px-3">Safety Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-cyber-800">
+                  {state.workerList.map((w) => (
+                    <tr key={w.id} className={w.status === 'Critical' ? 'bg-red-950/20' : 'hover:bg-cyber-800/40'}>
+                      <td className="py-2.5 px-3 font-bold text-cyan-400">{w.id}</td>
+                      <td className="py-2.5 px-3 text-white font-sans font-semibold">{w.name}</td>
+                      <td className="py-2.5 px-3 text-slate-400">{w.role}</td>
+                      <td className="py-2.5 px-3 font-bold">{w.zone}</td>
+                      <td className={`py-2.5 px-3 font-bold ${w.exposurePpm > 50 ? 'text-red-400' : 'text-slate-300'}`}>
+                        {w.exposurePpm} PPM
+                      </td>
+                      <td className="py-2.5 px-3 text-slate-300">{w.hr} BPM</td>
+                      <td className="py-2.5 px-3">
+                        <span className="px-2 py-0.5 rounded bg-cyber-900 border border-cyber-700 text-[10px] text-slate-300">
+                          {w.badge}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <span className={`px-2 py-0.5 rounded font-bold text-[10px] border ${
+                          w.status === 'Critical'
+                            ? 'bg-red-500/20 text-red-300 border-red-500/40 animate-pulse'
+                            : w.status === 'Warning'
+                            ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                            : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                        }`}>
+                          {w.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // VIEW 7: MULTI-LAYER EMERGENCY RESPONSE & ALARM FAILURE DETECTION
+    // =========================================================================
+    function ViewEmergencyResponse({ state, onSimulateAlarmFail, onStartEmergency, onOpenXai }) {
+      return (
+        <div className="flex flex-col gap-4">
+          
+          {/* Hero Feature Banner: Alarm Failure Detection */}
+          <div className="glass-card rounded-2xl p-6 border-red-500/40 shadow-2xl flex flex-col lg:flex-row items-center justify-between gap-6 bg-gradient-to-r from-red-950/40 via-cyber-900 to-cyber-950">
+            <div className="flex-1 flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-3xl">🛡️</span>
+                <div>
+                  <h3 className="text-base font-extrabold text-white uppercase tracking-wider">
+                    Autonomous Alarm Failure Detection & Multi-Layer Failover
+                  </h3>
+                  <p className="text-xs text-red-200 font-mono">
+                    Unique Core Feature: Never depend on an audible buzzer alone
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-300 leading-relaxed font-sans mt-1">
+                Industrial buzzers often fail due to salt/chemical corrosion, relay burnout, mechanical severed cables, or ambient high-decibel machinery masking. GASGUARD X continuously tests the electrical current heartbeat of the primary siren. If a failure is detected during critical gas levels, the system automatically triggers redundant visual strobes, personal wearable LoRa alerts, synthetic voice broadcasts, and control-room override pings.
+              </p>
+
+              <div className="flex items-center gap-4 text-xs font-mono mt-2">
+                <span>Primary Alarm Health: <strong className={state.primaryAlarmHealth === 'FAILED' ? 'text-red-400' : 'text-emerald-400'}>{state.primaryAlarmHealth === 'FAILED' ? '❌ POSSIBLE FAILURE' : '✅ WORKING'}</strong></span>
+                <span>Backup Alert System: <strong className="text-cyan-400">ACTIVATED</strong></span>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2.5 min-w-[240px]">
+              <button
+                id="btnSimulateAlarmFailHero"
+                onClick={onSimulateAlarmFail}
+                className="w-full py-3 px-4 rounded-xl text-xs font-black bg-gradient-to-r from-amber-600 to-red-600 hover:from-amber-500 hover:to-red-500 text-white shadow-xl shadow-red-900/40 border border-amber-400/50 transition-all flex items-center justify-center gap-2"
+              >
+                <span>⚡</span>
+                <span>SIMULATE PRIMARY ALARM FAILURE</span>
+              </button>
+
+              <button
+                onClick={onStartEmergency}
+                className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-cyber-800 hover:bg-cyber-700 text-slate-300 border border-cyber-700 transition-colors flex items-center justify-center gap-2"
+              >
+                <span>🚨</span>
+                <span>Run Emergency Simulation Mode</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Visual Failover Architecture Diagram */}
+          <div className="glass-card rounded-2xl p-5 border-cyber-700 shadow-xl flex flex-col gap-4">
+            <h4 className="text-sm font-bold text-white uppercase tracking-wider">7-Layer Redundant Safety Architecture</h4>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+              {[
+                { layer: 'Layer 1: Primary Siren', desc: 'Audible multi-tone siren network. Tested via continuous relay feedback current.', icon: '🔔', status: state.primaryAlarmHealth === 'FAILED' ? 'FAILED' : 'ACTIVE', color: 'border-red-500' },
+                { layer: 'Layer 2: Visual Xenon Beacons', desc: 'High-intensity overhead strobes piercing industrial smoke and dark zones.', icon: '💡', status: 'ACTIVE', color: 'border-cyan-500' },
+                { layer: 'Layer 3: Dashboard HUD Warning', desc: 'Top-priority visual and telemetry broadcast on all SCADA consoles.', icon: '🖥️', status: 'ACTIVE', color: 'border-cyan-500' },
+                { layer: 'Layer 4: LoRa Wearable Badges', desc: 'Vibrating haptic wristbands bypassing high background plant noise.', icon: '⌚', status: 'ACTIVE', color: 'border-cyan-500' },
+                { layer: 'Layer 5: Control-Room Override', desc: 'Emergency dispatcher override pings requiring supervisor acknowledgement.', icon: '📡', status: 'ACTIVE', color: 'border-cyan-500' },
+                { layer: 'Layer 6: Synthetic Voice Alerts', desc: 'Spoken automated PA announcements with clear dynamic zone coordinates.', icon: '🗣️', status: 'ACTIVE', color: 'border-cyan-500' },
+                { layer: 'Layer 7: Dynamic Egress Lasers', desc: 'Active directional lasers projecting green egress routes away from Zone B.', icon: '🟢', status: 'ACTIVE', color: 'border-cyan-500' },
+                { layer: 'Emergency Failover Logic', desc: 'Failover transition latency under 120ms with triple-redundant logic.', icon: '⚡', status: 'ENGAGED', color: 'border-indigo-500' },
+              ].map((item, idx) => (
+                <div key={idx} className={`p-4 rounded-xl bg-cyber-950/70 border flex flex-col justify-between ${item.color}`}>
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-lg">{item.icon}</span>
+                      <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${
+                        item.status === 'FAILED' ? 'bg-red-500/20 text-red-400 border-red-500/40 animate-pulse' : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
+                      }`}>
+                        {item.status}
+                      </span>
+                    </div>
+                    <div className="text-xs font-bold text-white">{item.layer}</div>
+                    <p className="text-[11px] text-slate-400 mt-1 font-sans">{item.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // VIEW 8: SENSOR RELIABILITY & FAULT DETECTION (CROSS-SENSOR VOTING)
+    // =========================================================================
+    function ViewSensorReliability({ state, onToggleFault, onOpenXai }) {
+      return (
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h3 className="text-base font-bold text-white uppercase tracking-wider">Sensor Reliability & Fault Tolerance Engine</h3>
+              <p className="text-xs text-slate-400 font-mono">Cross-sensor voting prevents false panics and eliminates single points of failure</p>
+            </div>
+            <button
+              onClick={onToggleFault}
+              className="px-3 py-1.5 rounded-lg font-bold text-xs bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 transition-colors"
+            >
+              {state.sensorFaultSimulated ? 'Clear Sensor 4 Fault' : 'Induce Sensor 4 Drift (42% Trust)'}
+            </button>
+          </div>
+
+          {/* Explanation Box */}
+          <div className="p-4 rounded-2xl bg-cyber-900 border border-cyber-700 shadow-xl flex items-start gap-3">
+            <span className="text-2xl mt-0.5">🛡️</span>
+            <div className="text-xs text-slate-300 leading-relaxed font-sans">
+              <strong className="text-cyan-300 text-sm block mb-1">
+                ENSEMBLE SENSOR CONSENSUS PRINCIPLE
+              </strong>
+              Traditional safety systems often trip or fail silently based on a single faulty detector. GASGUARD X runs a continuous cross-sensor voting algorithm. When Sensor 4 drifts abnormally while Sensors 1, 2, 3, and 5 agree, the system automatically lowers Sensor 4's trust score to 42%, flags a sensor fault, and adjusts voting weights so the true plant safety determination remains rock-solid.
+            </div>
+          </div>
+
+          {/* Sensor Comparison Matrix */}
+          <div className="glass-card rounded-2xl p-5 border-cyber-700 shadow-xl">
+            <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-4">Multi-Sensor Consensus Matrix</h4>
+            
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+              {state.sensors.map((sensor) => (
+                <div 
+                  key={sensor.id}
+                  className={`p-4 rounded-xl bg-cyber-950 border flex flex-col justify-between ${
+                    sensor.status !== 'Normal' ? 'border-amber-500 bg-amber-950/20' : 'border-cyber-800'
+                  }`}
+                >
+                  <div>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-xs font-mono font-bold text-cyan-400">{sensor.code}</span>
+                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                        sensor.status === 'Normal' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border-amber-500/40 animate-pulse'
+                      }`}>
+                        {sensor.status === 'Normal' ? 'Normal' : 'Abnormal'}
+                      </span>
+                    </div>
+
+                    <div className="text-xs font-bold text-white">{sensor.name}</div>
+                    
+                    <div className="my-3">
+                      <div className="text-[10px] font-mono text-slate-400">Current Reading</div>
+                      <div className="text-xl font-black text-white">{sensor.reading} <span className="text-xs text-slate-400 font-mono">Ω</span></div>
+                    </div>
+
+                    <div className="mb-2">
+                      <div className="flex justify-between text-xs font-mono mb-1">
+                        <span className="text-slate-400">Trust Score</span>
+                        <span className={`font-bold ${sensor.trust < 60 ? 'text-red-400' : 'text-emerald-400'}`}>{sensor.trust}%</span>
+                      </div>
+                      <div className="w-full bg-cyber-800 h-2 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full ${sensor.trust < 60 ? 'bg-red-500' : 'bg-emerald-500'}`} 
+                          style={{ width: `${sensor.trust}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="text-[10px] font-mono text-slate-400 pt-2 border-t border-cyber-800">
+                    {sensor.status === 'Normal' ? 'Voting Weight: 1.0 (Full)' : 'Voting Weight: 0.2 (Discounted)'}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {state.sensorFaultSimulated && (
+              <div className="mt-4 p-3 rounded-xl bg-amber-950/30 border border-amber-500/40 text-xs text-amber-200 font-mono flex items-center justify-between">
+                <span>⚠️ SENSOR S-04 TRUST SCORE: 42% &bull; POSSIBLE SENSOR FAULT DETECTED</span>
+                <span className="text-slate-300">Isolated from Emergency Trigger Threshold</span>
+              </div>
+            )}
+          </div>
+
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // VIEW 9: SAFETY RESILIENCE SCORE (6 PILLARS BREAKDOWN)
+    // =========================================================================
+    function ViewResilience({ computedResilience, state, onOpenXai }) {
+      return (
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h3 className="text-base font-bold text-white uppercase tracking-wider">Safety Resilience Score Assessment</h3>
+              <p className="text-xs text-slate-400 font-mono">Defensive redundancy metric across all 6 safety layers</p>
+            </div>
+            <button 
+              onClick={() => onOpenXai('resilience')}
+              className="text-xs text-indigo-400 hover:text-indigo-300 font-mono underline"
+            >
+              Methodology Explanation &rarr;
+            </button>
+          </div>
+
+          {/* Large Resilience Card */}
+          <div className="glass-card rounded-2xl p-6 border-indigo-500/40 shadow-xl flex flex-col md:flex-row items-center justify-around gap-6">
+            <div className="flex flex-col items-center">
+              <div className="relative w-44 h-44 flex items-center justify-center">
+                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 120 120">
+                  <circle cx="60" cy="60" r="50" stroke="#1e2b4f" strokeWidth="10" fill="transparent" />
+                  <circle
+                    cx="60"
+                    cy="60"
+                    r="50"
+                    stroke="#6366f1"
+                    strokeWidth="10"
+                    strokeDasharray={2 * Math.PI * 50}
+                    strokeDashoffset={2 * Math.PI * 50 * (1 - computedResilience.total / 100)}
+                    strokeLinecap="round"
+                    fill="transparent"
+                    className="transition-all duration-1000"
+                  />
+                </svg>
+                <div className="absolute flex flex-col items-center justify-center text-center">
+                  <span className="text-4xl font-black text-white">{computedResilience.total}</span>
+                  <span className="text-xs text-slate-400 font-mono">/ 100</span>
+                  <span className="text-[10px] font-bold text-indigo-300 uppercase mt-0.5">RESILIENCE TIER</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex-1 max-w-lg flex flex-col gap-3">
+              <div className="text-sm font-bold text-white">Overall Safety Posture: Defensive</div>
+              <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                The Safety Resilience Score quantifies the plant's capacity to absorb concurrent failures (e.g., equipment anomaly + sensor drift + primary alarm loss) without exposing workers to dangerous concentrations. A score above 75 indicates full defense-in-depth readiness.
+              </p>
+              <div className="p-3 rounded-xl bg-cyber-950 border border-cyber-700 text-xs font-mono text-slate-300">
+                <span className="text-amber-400 font-bold">WEAKEST SAFETY LAYER: </span>
+                Equipment Health ({state.equipment.find(e => e.id === 'V-101')?.health}% on Valve V-101) & Alarm Heartbeat.
+              </div>
+            </div>
+          </div>
+
+          {/* 6 Pillars Breakdown */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {computedResilience.layers.map((layer, idx) => (
+              <div key={idx} className="glass-card rounded-xl p-4 border-cyber-700 flex flex-col justify-between">
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-xs font-bold text-white">{layer.name}</span>
+                    <span className="text-xs font-mono font-bold text-indigo-300">{layer.score}%</span>
+                  </div>
+                  <div className="w-full bg-cyber-950 h-2 rounded-full overflow-hidden border border-cyber-800 mb-3">
+                    <div 
+                      className={`h-full ${layer.score < 70 ? 'bg-amber-500' : 'bg-indigo-500'}`} 
+                      style={{ width: `${layer.score}%` }}
+                    ></div>
+                  </div>
+                  <div className="text-[11px] text-slate-400 font-mono">Operational Status: <strong className="text-white">{layer.status}</strong></div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // VIEW 10: DIGITAL TWIN (VIRTUAL WHAT-IF SIMULATOR)
+    // =========================================================================
+    function ViewDigitalTwin({ state, onRunScenario, whatIfResults, onReset }) {
+      return (
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h3 className="text-base font-bold text-white uppercase tracking-wider">Digital Twin Virtual What-If Simulator</h3>
+              <p className="text-xs text-slate-400 font-mono">Test hypothetical failure cascades in a pure virtual sandbox without risking real plant hardware</p>
+            </div>
+            <button
+              onClick={onReset}
+              className="px-3 py-1.5 rounded-lg bg-cyber-800 hover:bg-cyber-700 text-xs font-mono text-slate-300 border border-cyber-700"
+            >
+              🔄 Reset Sandbox
+            </button>
+          </div>
+
+          {/* What-If Scenarios Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {[
+              { key: 'VALVE_FAIL', label: 'Valve V-101 Failure', icon: '🚰', desc: 'Simulates actuator packing seal blow-out & intense vibration' },
+              { key: 'PIPE_SURGE', label: 'Pipeline Abnormality', icon: '⚡', desc: 'Simulates high-pressure surge (4.2 bar) in Corridor Zone C' },
+              { key: 'VENT_CUT', label: 'Ventilation Reduction', icon: '🌀', desc: 'Cuts airflow by 65%, compounding toxic vapor accumulation' },
+              { key: 'ALARM_FAIL', label: 'Primary Alarm Failure', icon: '❌', desc: 'Simulates relay coil failure and assesses autonomous backup failover' },
+              { key: 'SENSOR_DRIFT', label: 'Sensor S-04 Poisoning', icon: '🔬', desc: 'Simulates sensor drift and evaluates cross-sensor voting resilience' },
+              { key: 'GAS_LEAK', label: 'Acute Ammonia Leak', icon: '💨', desc: 'Spikes concentration to 185 PPM in Zone B Compressor Bay' },
+            ].map((sc) => (
+              <div key={sc.key} className="glass-card rounded-xl p-4 border-cyber-700 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-xl">{sc.icon}</span>
+                    <span className="text-xs font-bold text-white">{sc.label}</span>
+                  </div>
+                  <p className="text-xs text-slate-400 leading-relaxed font-sans">{sc.desc}</p>
+                </div>
+                <button
+                  onClick={() => onRunScenario(sc.key)}
+                  className="mt-4 w-full py-2 px-3 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/40 text-xs font-bold font-mono transition-colors"
+                >
+                  RUN WHAT-IF SIMULATION &rarr;
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {/* What-If Results Delta Box */}
+          {whatIfResults && (
+            <div className="glass-card rounded-2xl p-5 border-indigo-500/50 shadow-2xl bg-indigo-950/20">
+              <div className="flex items-center justify-between mb-3 border-b border-indigo-500/30 pb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">🔮</span>
+                  <h4 className="text-sm font-bold text-white uppercase tracking-wider">What-If Simulation Results: {whatIfResults.name}</h4>
+                </div>
+                <span className="text-xs font-mono text-slate-400">Executed at {whatIfResults.timestamp}</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+                <div className="p-3 rounded-xl bg-cyber-950 border border-cyber-700">
+                  <div className="text-[10px] font-mono text-slate-400 uppercase">Risk Level Shift</div>
+                  <div className="text-2xl font-black text-amber-400 mt-1">+{whatIfResults.deltaRisk}%</div>
+                </div>
+                <div className="p-3 rounded-xl bg-cyber-950 border border-cyber-700">
+                  <div className="text-[10px] font-mono text-slate-400 uppercase">Gas PPM Delta</div>
+                  <div className="text-2xl font-black text-white mt-1">+{whatIfResults.deltaGas} PPM</div>
+                </div>
+                <div className="p-3 rounded-xl bg-cyber-950 border border-cyber-700">
+                  <div className="text-[10px] font-mono text-slate-400 uppercase">Equipment Degradation</div>
+                  <div className="text-2xl font-black text-red-400 mt-1">{whatIfResults.deltaHealth}%</div>
+                </div>
+              </div>
+
+              <p className="text-xs text-indigo-200 font-mono">{whatIfResults.notes}</p>
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // VIEW 11: ROOT CAUSE / FAILURE CHAIN TIMELINE
+    // =========================================================================
+    function ViewFailureChain({ state, onOpenXai }) {
+      const steps = [
+        { num: '01', title: 'Equipment Anomaly', desc: 'Vibration spike on Valve V-101 (4.8 mm/s)', status: 'TRIGGER' },
+        { num: '02', title: 'Gas Concentration Increase', desc: 'Ammonia rises past 25 PPM OSHA baseline', status: 'DISPERSION' },
+        { num: '03', title: 'Gas Detection', desc: '5-Channel E-Nose captures multi-sensor footprint', status: 'CLASSIFICATION' },
+        { num: '04', title: 'Risk Prediction', desc: 'AI calculates 87% pre-leak breach probability', status: 'PREDICTION' },
+        { num: '05', title: 'Alarm Activation', desc: 'Primary alarm siren commanded to activate', status: 'ALARM' },
+        { num: '06', title: 'Alarm Health Verification', desc: 'Relay heartbeat confirms siren failure (Feature 9)', status: 'VERIFICATION' },
+        { num: '07', title: 'Backup Alert Activated', desc: 'Autonomous strobes, voice & LoRa badges engage', status: 'FAILOVER' },
+        { num: '08', title: 'Worker Evacuation', desc: 'Zone B personnel routed to West Assembly Point', status: 'EGRESS' },
+        { num: '09', title: 'Incident Resolution', desc: 'Automated isolation valve seals pipeline', status: 'CONTAINMENT' },
+      ];
+
+      return (
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h3 className="text-base font-bold text-white uppercase tracking-wider">AI Root Cause & Incident Failure Chain</h3>
+              <p className="text-xs text-slate-400 font-mono">Sequential event tree from mechanical anomaly to autonomous resolution</p>
+            </div>
+          </div>
+
+          {/* Sequential Timeline */}
+          <div className="glass-card rounded-2xl p-6 border-cyber-700 shadow-xl flex flex-col gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-9 gap-2">
+              {steps.map((st, idx) => (
+                <div key={idx} className="p-3 rounded-xl bg-cyber-950 border border-cyber-800 flex flex-col justify-between relative group hover:border-cyan-500 transition-colors">
+                  <div>
+                    <div className="text-[10px] font-mono font-bold text-cyan-400 mb-1">{st.num}</div>
+                    <div className="text-xs font-bold text-white leading-tight">{st.title}</div>
+                    <p className="text-[10px] text-slate-400 mt-1 leading-snug">{st.desc}</p>
+                  </div>
+                  <span className="mt-2 text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-cyber-900 text-slate-300 border border-cyber-700 text-center">
+                    {st.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Contributing Factors Radar Breakdown */}
+          <div className="glass-card rounded-2xl p-5 border-cyber-700 shadow-xl">
+            <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-3">Incident Contributing Factors Attribution</h4>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              {[
+                { factor: 'Equipment Failure', pct: 35, color: 'text-red-400', bar: 'bg-red-500' },
+                { factor: 'Alarm Relay Burnout', pct: 25, color: 'text-amber-400', bar: 'bg-amber-500' },
+                { factor: 'Sensor Drift / Noise', pct: 15, color: 'text-cyan-400', bar: 'bg-cyan-500' },
+                { factor: 'Environment / Wind', pct: 10, color: 'text-slate-300', bar: 'bg-slate-400' },
+                { factor: 'Communication Lag', pct: 10, color: 'text-purple-400', bar: 'bg-purple-500' },
+                { factor: 'Maintenance Delay', pct: 5, color: 'text-emerald-400', bar: 'bg-emerald-500' },
+              ].map((item, idx) => (
+                <div key={idx} className="p-3 rounded-xl bg-cyber-950 border border-cyber-800 flex flex-col justify-between">
+                  <div>
+                    <div className="text-xs font-bold text-white">{item.factor}</div>
+                    <div className={`text-xl font-black mt-1 ${item.color}`}>{item.pct}%</div>
+                  </div>
+                  <div className="w-full bg-cyber-900 h-1.5 rounded-full overflow-hidden mt-2">
+                    <div className={`h-full ${item.bar}`} style={{ width: `${item.pct * 2.5}%` }}></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // VIEW 12: INCIDENT INTELLIGENCE (HISTORICAL ARCHIVES & RECURRING PATTERNS)
+    // =========================================================================
+    function ViewIncidentIntelligence({ state }) {
+      return (
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h3 className="text-base font-bold text-white uppercase tracking-wider">Incident Intelligence & Predictive Lessons Learned</h3>
+              <p className="text-xs text-slate-400 font-mono">Historical plant incident log & recurring failure pattern detection</p>
+            </div>
+          </div>
+
+          {/* Recurring Pattern Detection Banner */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="glass-card rounded-xl p-4 border-red-500/30">
+              <div className="text-xs font-mono text-slate-400">Recurring Pattern 1</div>
+              <div className="text-sm font-bold text-white mt-1">Equipment Valve Fatigue</div>
+              <div className="text-xs font-mono text-red-400 mt-1">38% of all events</div>
+            </div>
+
+            <div className="glass-card rounded-xl p-4 border-amber-500/30">
+              <div className="text-xs font-mono text-slate-400">Recurring Pattern 2</div>
+              <div className="text-sm font-bold text-white mt-1">Primary Siren Relay Failure</div>
+              <div className="text-xs font-mono text-amber-400 mt-1">24% of all events</div>
+            </div>
+
+            <div className="glass-card rounded-xl p-4 border-cyan-500/30">
+              <div className="text-xs font-mono text-slate-400">Recurring Pattern 3</div>
+              <div className="text-sm font-bold text-white mt-1">Poor Ventilation Stagnation</div>
+              <div className="text-xs font-mono text-cyan-400 mt-1">20% of all events</div>
+            </div>
+
+            <div className="glass-card rounded-xl p-4 border-purple-500/30">
+              <div className="text-xs font-mono text-slate-400">Recurring Pattern 4</div>
+              <div className="text-sm font-bold text-white mt-1">Sensor Moisture Drift</div>
+              <div className="text-xs font-mono text-purple-400 mt-1">18% of all events</div>
+            </div>
+          </div>
+
+          {/* Historical Incident Table */}
+          <div className="glass-card rounded-2xl p-5 border-cyber-700 shadow-xl">
+            <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-3">Historical Incident Archive</h4>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs font-mono text-left">
+                <thead className="bg-cyber-950 border-b border-cyber-700 text-slate-400 uppercase text-[10px]">
+                  <tr>
+                    <th className="py-2.5 px-3">Incident ID</th>
+                    <th className="py-2.5 px-3">Date</th>
+                    <th className="py-2.5 px-3">Location</th>
+                    <th className="py-2.5 px-3">Gas Species</th>
+                    <th className="py-2.5 px-3">Peak PPM</th>
+                    <th className="py-2.5 px-3">Root Cause</th>
+                    <th className="py-2.5 px-3">Alarm Response</th>
+                    <th className="py-2.5 px-3">Lessons Learned</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-cyber-800">
+                  {state.historicalIncidents.map((inc) => (
+                    <tr key={inc.id} className="hover:bg-cyber-800/40">
+                      <td className="py-2.5 px-3 font-bold text-cyan-400">{inc.id}</td>
+                      <td className="py-2.5 px-3 text-slate-300">{inc.date}</td>
+                      <td className="py-2.5 px-3 font-bold text-white">{inc.zone}</td>
+                      <td className="py-2.5 px-3 text-cyan-300">{inc.gas}</td>
+                      <td className="py-2.5 px-3 font-bold text-red-400">{inc.peakPpm} PPM</td>
+                      <td className="py-2.5 px-3 text-slate-300 font-sans">{inc.cause}</td>
+                      <td className="py-2.5 px-3 text-amber-300">{inc.alarmStatus}</td>
+                      <td className="py-2.5 px-3 text-slate-400 font-sans text-[11px]">{inc.lessons}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // VIEW 13: EXPLAINABLE AI (XAI) TRANSPARENCY DEEP DIVE
+    // =========================================================================
+    function ViewExplainableAi({ state, currentRisk }) {
+      return (
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h3 className="text-base font-bold text-white uppercase tracking-wider">Explainable AI (XAI) Model Architecture</h3>
+              <p className="text-xs text-slate-400 font-mono">SHAP feature values, model decision boundaries & human-readable logic</p>
+            </div>
+          </div>
+
+          <div className="glass-card rounded-2xl p-6 border-cyan-500/40 shadow-xl flex flex-col gap-4">
+            <h4 className="text-sm font-bold text-white uppercase tracking-wider">Why is the Current Risk Predicted as {currentRisk.level.toUpperCase()}?</h4>
+            
+            <div className="p-4 rounded-xl bg-cyber-950 border border-cyber-700 text-xs font-sans text-slate-300 leading-relaxed">
+              <strong className="text-cyan-400 block mb-1">Human-in-the-Loop Explanation:</strong>
+              The GASGUARD X predictive model is not a black-box neural net. It utilizes a gradient-boosted decision tree ensemble trained with constrained monotonic feature interactions. The primary contributors driving the current {currentRisk.level} status are:
+              <ul className="list-disc list-inside mt-2 space-y-1 text-slate-300 font-mono">
+                <li>Gas concentration is at <strong className="text-white">{state.gasConcentration} PPM</strong>, exceeding the baseline OSHA TWA threshold (+38% impact).</li>
+                <li>Pneumatic pipeline pressure is at <strong className="text-white">{state.pressure} bar</strong>, reflecting abnormal upstream head pressure (+24% impact).</li>
+                <li>Vibration frequency FFT registers <strong className="text-white">{state.vibration} mm/s</strong>, indicating mechanical seal chatter (+19% impact).</li>
+                <li>Valve V-101 reported a 64% degradation health score (+12% impact).</li>
+                <li>Cross-sensor consensus confirms {state.sensorFaultSimulated ? 'Sensor S-04 fault drift isolated' : '100% sensor consensus'}.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // SVG FACTORY FLOOR MAP COMPONENT (2D INTERACTIVE SCHEMATIC)
+    // =========================================================================
+    function FactoryFloorMapSvg({ state, currentRisk, large = false }) {
+      const isPlumeCritical = currentRisk.score >= 65;
+
+      return (
+        <svg viewBox="0 0 600 420" className={`w-full ${large ? 'h-[440px]' : 'h-full max-h-[360px]'}`}>
+          <defs>
+            {/* Critical Plume Gradient */}
+            <radialGradient id="gradPlumeCrit" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#ef4444" stopOpacity="0.85" />
+              <stop offset="40%" stopColor="#f97316" stopOpacity="0.5" />
+              <stop offset="100%" stopColor="#ef4444" stopOpacity="0.0" />
+            </radialGradient>
+            {/* Warning Plume Gradient */}
+            <radialGradient id="gradPlumeWarn" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.65" />
+              <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.0" />
+            </radialGradient>
+          </defs>
+
+          {/* Grid lines */}
+          <line x1="10" y1="210" x2="590" y2="210" stroke="#1e2b4f" strokeDasharray="4 4" strokeWidth="1.5" />
+          <line x1="300" y1="10" x2="300" y2="410" stroke="#1e2b4f" strokeDasharray="4 4" strokeWidth="1.5" />
+
+          {/* ZONE A: Raw Gas Storage (Top Left) */}
+          <rect x="20" y="20" width="265" height="180" rx="10" fill="rgba(16, 185, 129, 0.05)" stroke="#10b981" strokeWidth="1.5" strokeOpacity="0.4" />
+          <text x="35" y="45" fill="#10b981" fontSize="12" fontWeight="700" fontFamily="JetBrains Mono">ZONE A: TANK STORAGE</text>
+          <text x="35" y="62" fill="#64748b" fontSize="10" fontFamily="JetBrains Mono">Gas: {state.zones['Zone A'].gasPpm} PPM &bull; Safe</text>
+
+          {/* ZONE B: Compressor & Valve Bay (Top Right - Probable Leak Location) */}
+          <rect 
+            x="315" y="20" width="265" height="180" rx="10" 
+            fill={isPlumeCritical ? "rgba(239, 68, 68, 0.18)" : "rgba(245, 158, 11, 0.1)"} 
+            stroke={isPlumeCritical ? "#ef4444" : "#f59e0b"} 
+            strokeWidth="2.5" 
+          />
+          <text x="330" y="45" fill="#ef4444" fontSize="12" fontWeight="700" fontFamily="JetBrains Mono">ZONE B: COMPRESSOR &amp; VALVES</text>
+          <text x="330" y="62" fill="#fca5a5" fontSize="10" fontWeight="bold" fontFamily="JetBrains Mono">⚠️ CRITICAL LEAK ORIGIN (89% CONF)</text>
+
+          {/* ZONE C: Process Corridor (Bottom Left) */}
+          <rect x="20" y="220" width="265" height="180" rx="10" fill="rgba(245, 158, 11, 0.08)" stroke="#f59e0b" strokeWidth="1.5" strokeOpacity="0.5" />
+          <text x="35" y="245" fill="#f59e0b" fontSize="12" fontWeight="700" fontFamily="JetBrains Mono">ZONE C: PIPELINE CORRIDOR</text>
+          <text x="35" y="262" fill="#64748b" fontSize="10" fontFamily="JetBrains Mono">Gas: {state.zones['Zone C'].gasPpm} PPM &bull; Buffer</text>
+
+          {/* ZONE D: Venting & Flare Bay (Bottom Right) */}
+          <rect x="315" y="220" width="265" height="180" rx="10" fill="rgba(16, 185, 129, 0.05)" stroke="#10b981" strokeWidth="1.5" strokeOpacity="0.4" />
+          <text x="330" y="245" fill="#10b981" fontSize="12" fontWeight="700" fontFamily="JetBrains Mono">ZONE D: VENTING &amp; FLARE BAY</text>
+          <text x="330" y="262" fill="#64748b" fontSize="10" fontFamily="JetBrains Mono">Gas: {state.zones['Zone D'].gasPpm} PPM &bull; Safe</text>
+
+          {/* Dynamic Gas Dispersion Plume in Zone B */}
+          {isPlumeCritical && (
+            <g transform="translate(440, 110)">
+              <circle r="75" fill="url(#gradPlumeCrit)" className="animate-plume" />
+              <circle r="30" fill="#ef4444" fillOpacity="0.4" />
+              <circle r="6" fill="#ffffff" />
+              <text x="12" y="4" fill="#ffffff" fontSize="9" fontWeight="bold" fontFamily="JetBrains Mono">LEAK CENTROID</text>
+            </g>
+          )}
+
+          {/* Evacuation Route Arrows pointing to West Exit */}
+          <path d="M 330 150 L 220 150 L 15 150" fill="none" stroke="#10b981" strokeWidth="2.5" strokeDasharray="6 4" />
+          <polygon points="15,145 5,150 15,155" fill="#10b981" />
+          <text x="15" y="140" fill="#10b981" fontSize="10" fontWeight="bold" fontFamily="JetBrains Mono">WEST EXIT 2 &larr;</text>
+
+          {/* Equipment Symbols */}
+          {/* Valve V-101 in Zone B */}
+          <g transform="translate(470, 150)">
+            <rect x="-16" y="-14" width="32" height="28" rx="6" fill="#0f172a" stroke="#ef4444" strokeWidth="2" />
+            <text x="0" y="4" fill="#ffffff" fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="JetBrains Mono">V-101</text>
+          </g>
+
+          {/* Pipeline P-204 in Zone C */}
+          <g transform="translate(180, 290)">
+            <rect x="-16" y="-14" width="32" height="28" rx="6" fill="#0f172a" stroke="#38bdf8" strokeWidth="2" />
+            <text x="0" y="4" fill="#ffffff" fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="JetBrains Mono">P-204</text>
+          </g>
+
+          {/* Compressor C-302 in Zone B */}
+          <g transform="translate(370, 140)">
+            <rect x="-16" y="-14" width="32" height="28" rx="6" fill="#0f172a" stroke="#f59e0b" strokeWidth="2" />
+            <text x="0" y="4" fill="#ffffff" fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="JetBrains Mono">C-302</text>
+          </g>
+
+          {/* Worker Pins with tooltips and pulsating beacons */}
+          {state.workerList.map((w) => (
+            <g key={w.id} transform={`translate(${w.x}, ${w.y})`}>
+              {w.status === 'Critical' && (
+                <circle r="12" fill="#ef4444" fillOpacity="0.5" className="animate-ping" />
+              )}
+              <circle r="6" fill={w.status === 'Critical' ? '#ef4444' : w.status === 'Warning' ? '#f59e0b' : '#10b981'} stroke="#ffffff" strokeWidth="1.5" />
+              <text x="9" y="4" fill="#e2e8f0" fontSize="8" fontWeight="bold" fontFamily="JetBrains Mono">{w.id}</text>
+            </g>
+          ))}
+        </svg>
+      );
+    }
+
+    // =========================================================================
+    // SVG RADAR SIGNATURE COMPONENT (E-NOSE FOOTPRINT)
+    // =========================================================================
+    function RadarSignatureSvg({ sensors }) {
+      const pointsLive = [
+        "150,45",
+        "225,95",
+        "205,190",
+        "95,190",
+        "75,95",
+      ].join(" ");
+
+      const pointsBaseline = [
+        "150,90",
+        "185,115",
+        "170,160",
+        "130,160",
+        "115,115",
+      ].join(" ");
+
+      return (
+        <svg viewBox="0 0 300 240" className="w-full max-h-[220px]">
+          {/* Concentric Polygons */}
+          <polygon points="150,30 245,95 210,210 90,210 55,95" fill="none" stroke="#1e2b4f" strokeWidth="1" />
+          <polygon points="150,65 215,110 190,185 110,185 85,110" fill="none" stroke="#1e2b4f" strokeWidth="1" />
+          <polygon points="150,100 185,125 170,160 130,160 115,125" fill="none" stroke="#1e2b4f" strokeWidth="1" />
+
+          {/* Axes */}
+          <line x1="150" y1="135" x2="150" y2="30" stroke="#1e2b4f" strokeWidth="1" />
+          <line x1="150" y1="135" x2="245" y2="95" stroke="#1e2b4f" strokeWidth="1" />
+          <line x1="150" y1="135" x2="210" y2="210" stroke="#1e2b4f" strokeWidth="1" />
+          <line x1="150" y1="135" x2="90" y2="210" stroke="#1e2b4f" strokeWidth="1" />
+          <line x1="150" y1="135" x2="55" y2="95" stroke="#1e2b4f" strokeWidth="1" />
+
+          {/* Baseline Footprint */}
+          <polygon points={pointsBaseline} fill="rgba(100, 116, 139, 0.2)" stroke="#64748b" strokeWidth="1.5" strokeDasharray="3 3" />
+
+          {/* Live Footprint */}
+          <polygon points={pointsLive} fill="rgba(6, 182, 212, 0.25)" stroke="#06b6d4" strokeWidth="2.5" />
+
+          {/* Labels */}
+          <text x="150" y="20" fill="#06b6d4" fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="JetBrains Mono">S1: NH₃</text>
+          <text x="255" y="95" fill="#94a3b8" fontSize="9" fontWeight="bold" fontFamily="JetBrains Mono">S2: COMB</text>
+          <text x="220" y="225" fill="#94a3b8" fontSize="9" fontWeight="bold" fontFamily="JetBrains Mono">S3: TOX</text>
+          <text x="75" y="225" fill="#94a3b8" fontSize="9" fontWeight="bold" textAnchor="end" fontFamily="JetBrains Mono">S4: PID</text>
+          <text x="45" y="95" fill="#94a3b8" fontSize="9" fontWeight="bold" textAnchor="end" fontFamily="JetBrains Mono">S5: MOS</text>
+        </svg>
+      );
+    }
+
+    // =========================================================================
+    // SVG RISK TREND LINE GRAPH COMPONENT
+    // =========================================================================
+    function RiskTrendLineSvg({ currentRisk }) {
+      const currentY = Math.max(20, Math.min(180, 200 - (currentRisk * 1.8)));
+
+      return (
+        <svg viewBox="0 0 500 200" className="w-full h-full">
+          {/* Threshold Zones */}
+          <rect x="40" y="10" width="450" height="40" fill="rgba(239, 68, 68, 0.08)" />
+          <rect x="40" y="50" width="450" height="40" fill="rgba(249, 115, 22, 0.08)" />
+          <rect x="40" y="90" width="450" height="50" fill="rgba(245, 158, 11, 0.08)" />
+          <rect x="40" y="140" width="450" height="50" fill="rgba(16, 185, 129, 0.08)" />
+
+          {/* Y Axis Guidelines */}
+          <line x1="40" y1="50" x2="490" y2="50" stroke="#ef4444" strokeDasharray="3 3" strokeWidth="1" strokeOpacity="0.4" />
+          <text x="35" y="53" fill="#ef4444" fontSize="8" textAnchor="end" fontFamily="JetBrains Mono">80%</text>
+
+          <line x1="40" y1="90" x2="490" y2="90" stroke="#f97316" strokeDasharray="3 3" strokeWidth="1" strokeOpacity="0.4" />
+          <text x="35" y="93" fill="#f97316" fontSize="8" textAnchor="end" fontFamily="JetBrains Mono">60%</text>
+
+          <line x1="40" y1="140" x2="490" y2="140" stroke="#10b981" strokeDasharray="3 3" strokeWidth="1" strokeOpacity="0.4" />
+          <text x="35" y="143" fill="#10b981" fontSize="8" textAnchor="end" fontFamily="JetBrains Mono">40%</text>
+
+          {/* Trend Line (Past 60 mins -> Rising to Current) */}
+          <path
+            d={`M 40,165 Q 120,160 180,150 T 260,135 T 340,110 T 420,70 L 480,${currentY}`}
+            fill="none"
+            stroke="#f59e0b"
+            strokeWidth="3"
+          />
+
+          {/* Current Risk Point */}
+          <circle cx="480" cy={currentY} r="6" fill="#ef4444" className="animate-ping" />
+          <circle cx="480" cy={currentY} r="4" fill="#ffffff" />
+          <text x="475" y={currentY - 10} fill="#f87171" fontSize="10" fontWeight="bold" textAnchor="end" fontFamily="JetBrains Mono">
+            NOW: {currentRisk}%
+          </text>
+        </svg>
+      );
+    }
+
+    // ==========================================
+    // MOUNT APPLICATION
+    // ==========================================
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<GasGuardApp />);
+  </script>
+</body>
+</html>

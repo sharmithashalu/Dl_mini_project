@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}GASGUARD X - Equipment Health Monitoring{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-xl-4">
+
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+      <h3 class="text-white fw-bold mb-1"><i class="bi bi-gear-wide-connected text-success"></i> Module 3: Industrial Equipment Health Monitoring</h3>
+      <p class="text-muted small mb-0">Multi-parameter telemetry (Pressure, Flow, Temperature, Vibration) with pre-failure anomaly diagnostics.</p>
+    </div>
+    <div class="d-flex gap-2">
+      <span class="badge bg-info text-dark fs-6 p-2">Plant Health Index: {{ state.equipment.average_health }}%</span>
+    </div>
+  </div>
+
+  <!-- Assets Grid -->
+  <div class="row g-3 mb-4">
+    {% for asset in state.equipment.assets %}
+    <div class="col-12 col-md-6 col-xl-3">
+      <div class="glass-panel p-3 border-{{ asset.status_class }} h-100">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <div>
+            <span class="badge bg-secondary mb-1">{{ asset.asset_id }} &bull; {{ asset.type }}</span>
+            <h5 class="text-white mb-0">{{ asset.zone }}</h5>
+          </div>
+          <span class="badge bg-{{ asset.status_class }}">{{ asset.status }}</span>
+        </div>
+
+        <!-- Health Meter -->
+        <div class="my-3">
+          <div class="d-flex justify-content-between text-muted small mb-1">
+            <span>Asset Health Score:</span>
+            <strong class="text-white fs-5 font-monospace">{{ asset.health_score }}%</strong>
+          </div>
+          <div class="progress bg-dark" style="height: 10px;">
+            <div class="progress-bar bg-{{ asset.status_class }}" style="width: {{ asset.health_score }}%;"></div>
+          </div>
+        </div>
+
+        <!-- Telemetry Parameters -->
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <div class="p-2 bg-dark bg-opacity-60 rounded border border-secondary border-opacity-25">
+              <small class="text-muted d-block">Line Pressure</small>
+              <strong class="text-info font-monospace">{{ asset.pressure }} bar</strong>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="p-2 bg-dark bg-opacity-60 rounded border border-secondary border-opacity-25">
+              <small class="text-muted d-block">Volumetric Flow</small>
+              <strong class="text-white font-monospace">{{ asset.flow }} m³/h</strong>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="p-2 bg-dark bg-opacity-60 rounded border border-secondary border-opacity-25">
+              <small class="text-muted d-block">Operating Temp</small>
+              <strong class="text-warning font-monospace">{{ asset.temperature }} °C</strong>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="p-2 bg-dark bg-opacity-60 rounded border border-secondary border-opacity-25">
+              <small class="text-muted d-block">Vibration (RMS)</small>
+              <strong class="text-{{ 'danger' if asset.vibration > 4.5 else 'white' }} font-monospace">{{ asset.vibration }} mm/s</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Diagnostic Reasons -->
+        <div class="alert alert-dark border-secondary small mb-0 py-2">
+          <strong class="text-warning"><i class="bi bi-wrench-adjustable-circle"></i> Diagnostics:</strong><br>
+          {{ asset.fault_reason }}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Asset Comparison Chart & Mechanical Disclaimer -->
+  <div class="row g-3">
+    <div class="col-12 col-lg-8">
+      <div class="glass-panel p-3">
+        <h5 class="text-white mb-3"><i class="bi bi-bar-chart-fill text-info"></i> Asset Health Degradation Comparison</h5>
+        <div style="height: 250px;">
+          <canvas id="equipmentHealthChart"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-lg-4">
+      <div class="glass-panel p-3 h-100">
+        <h5 class="text-white mb-2"><i class="bi bi-shield-exclamation text-warning"></i> Predictive Support Disclaimer</h5>
+        <p class="text-muted small">
+          Equipment health scoring is computed via multi-parameter variance from nominal ISO 10816 mechanical baselines.
+        </p>
+        <p class="text-muted small mb-0">
+          <strong>Important:</strong> This software is a decision-support prototype and does not provide an infallible physical prediction of metallurgical fracture or mechanical fatigue.
+        </p>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

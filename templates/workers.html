@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}GASGUARD X - Personnel Exposure & Wearable HUD{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-xl-4">
+
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+      <h3 class="text-white fw-bold mb-1"><i class="bi bi-people-fill text-purple"></i> Module 6: Worker Exposure Risk &amp; Wearable Dispatch</h3>
+      <p class="text-muted small mb-0">Continuous personal dosimeter estimation, LoRa wearable haptics, and evacuation pathway routing.</p>
+    </div>
+    <div class="d-flex gap-2">
+      <span class="badge bg-danger fs-6 p-2">{{ state.workers.workers_critical }} Personnel at Critical Risk</span>
+      <button class="btn btn-sm btn-outline-danger" onclick="window.gasguardClient.speakAlert('Attention all personnel: Evacuate Zone B immediately.');">
+        <i class="bi bi-megaphone-fill"></i> Trigger Evacuation Broadcast
+      </button>
+    </div>
+  </div>
+
+  <!-- Worker Cards Grid -->
+  <div class="row g-3 mb-4">
+    {% for w in state.workers.workers %}
+    <div class="col-12 col-md-6 col-xl-3">
+      <div class="glass-panel p-3 border-{{ w.badge_class }} h-100">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <div>
+            <span class="badge bg-secondary mb-1">{{ w.worker_id }}</span>
+            <h5 class="text-white mb-0">{{ w.name }}</h5>
+            <small class="text-muted">{{ w.role }}</small>
+          </div>
+          <span class="badge bg-{{ w.badge_class }} fs-6">{{ w.exposure_risk }}</span>
+        </div>
+
+        <div class="p-2 rounded bg-dark bg-opacity-60 border border-secondary border-opacity-25 mb-3">
+          <div class="d-flex justify-content-between text-muted small mb-1">
+            <span>Plant Location:</span>
+            <strong class="text-white">{{ w.zone }}</strong>
+          </div>
+          <div class="d-flex justify-content-between text-muted small mb-1">
+            <span>Estimated Gas Dosage:</span>
+            <strong class="text-{{ 'danger' if w.local_ppm > 25 else 'success' }}">{{ w.local_ppm }} PPM</strong>
+          </div>
+          <div class="d-flex justify-content-between text-muted small">
+            <span>Distance to Plume:</span>
+            <strong class="text-info">{{ w.distance_to_leak_m }} meters</strong>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <small class="text-muted text-uppercase fw-bold" style="font-size: 0.72rem;">Wearable LoRa Device ({{ w.wearable_id }})</small>
+          <div class="d-flex align-items-center gap-2 mt-1">
+            <i class="bi bi-smartwatch text-{{ 'danger' if w.exposure_risk == 'CRITICAL' else 'info' }} fs-5"></i>
+            <span class="text-white small fw-bold">{{ w.wearable_status }}</span>
+          </div>
+        </div>
+
+        <div class="alert alert-dark border-secondary small mb-0 py-2">
+          <strong class="text-warning"><i class="bi bi-signpost-split-fill"></i> Directive:</strong><br>
+          {{ w.action }}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Muster Station & Evacuation Map Guidance -->
+  <div class="row g-3">
+    <div class="col-12 col-lg-8">
+      <div class="glass-panel p-3">
+        <h5 class="text-white mb-2"><i class="bi bi-shield-check text-success"></i> Plant Evacuation Corridors &amp; Safe Muster Points</h5>
+        <div class="table-responsive">
+          <table class="table table-custom">
+            <thead>
+              <tr>
+                <th>Zone Origin</th>
+                <th>Designated Safe Exit Pathway</th>
+                <th>Primary Assembly Station</th>
+                <th>Ventilation Fan Overrides</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Zone A (Storage)</strong></td>
+                <td>West Emergency Gantry 1 &rarr; Exterior Perimeter</td>
+                <td>Muster Point Alpha (North Field)</td>
+                <td><span class="badge bg-success">Routine Exhaust</span></td>
+              </tr>
+              <tr class="table-active">
+                <td><strong>Zone B (Compressor Bay)</strong></td>
+                <td><span class="text-danger fw-bold">Corridor A Blast Door &rarr; South Airlock Exit</span></td>
+                <td>Muster Point Bravo (Command Office)</td>
+                <td><span class="badge bg-danger">Emergency High Boost Active</span></td>
+              </tr>
+              <tr>
+                <td><strong>Zone C (Pipelines)</strong></td>
+                <td>East Corridor 2 &rarr; Service Bay Walkway</td>
+                <td>Muster Point Charlie (Logistics Gate)</td>
+                <td><span class="badge bg-warning text-dark">50% Scrubber Velocity</span></td>
+              </tr>
+              <tr>
+                <td><strong>Zone D (Venting Hub)</strong></td>
+                <td>North Fire Door 4 &rarr; Exterior Bay</td>
+                <td>Muster Point Delta (Substation Road)</td>
+                <td><span class="badge bg-success">Routine Exhaust</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-4">
+      <div class="glass-panel p-3 h-100">
+        <h5 class="text-white mb-2"><i class="bi bi-broadcast text-info"></i> Wearable Hardware Integration</h5>
+        <p class="text-muted small">
+          Simulated IoT wristband telemetry. Compatible with ESP32-S3 BLE/LoRa transmitter modules for real-world physical haptic vibrator drivers.
+        </p>
+        <div class="p-3 bg-dark rounded border border-secondary border-opacity-25 font-monospace text-info small">
+          <code>
+            // LoRa Dispatch Packet<br>
+            {<br>
+            &nbsp;&nbsp;"target": "BAND-901",<br>
+            &nbsp;&nbsp;"cmd": "HAPTIC_ALERT_CRITICAL",<br>
+            &nbsp;&nbsp;"freq": "180Hz_BURST",<br>
+            &nbsp;&nbsp;"zone_evac": "ZONE_B"<br>
+            }
+          </code>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

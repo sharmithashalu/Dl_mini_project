@@ -1,0 +1,595 @@
+{% extends "base.html" %}
+
+{% block title %}GASGUARD X - Command Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-xl-4">
+
+  <!-- ROLE-BASED CONDITIONAL HUDS -->
+  {% if active_role == 'worker' %}
+  <!-- Worker Personal Safety HUD -->
+  <div class="glass-panel p-3 mb-3 border-danger bg-danger bg-opacity-10">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+      <div class="d-flex align-items-center gap-3">
+        <div class="stat-icon bg-danger text-white fs-2">
+          <i class="bi bi-person-exclamation"></i>
+        </div>
+        <div>
+          <span class="badge bg-danger mb-1">WORKER SAFETY HUD &bull; W001 (John Vance)</span>
+          <h4 class="mb-0 text-white">Current Location: <span class="text-warning">{{ state.localization.probable_zone }}</span></h4>
+          <p class="text-light small mb-0">Local Gas Dosage: <strong>{{ state.gas.concentration_ppm }} PPM</strong> &bull; Wearable Status: <span class="text-danger fw-bold">PULSING HAPTIC + AUDIBLE CHIRP</span></p>
+        </div>
+      </div>
+      <div class="d-flex gap-2">
+        <a href="#factoryMapSection" class="btn btn-warning fw-bold text-dark"><i class="bi bi-box-arrow-right"></i> View Evacuation Route</a>
+        <button class="btn btn-outline-light" onclick="window.gasguardClient.speakAlert('Evacuation alert confirmed on wristband.');"><i class="bi bi-check-circle"></i> Confirm Wearable Ack</button>
+      </div>
+    </div>
+  </div>
+  {% elif active_role == 'safety_officer' %}
+  <!-- Safety Officer Triage Banner -->
+  <div class="glass-panel p-3 mb-3 border-warning bg-warning bg-opacity-10">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+      <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-shield-shaded text-warning fs-3"></i>
+        <div>
+          <h5 class="mb-0 text-white">Safety Officer Dispatch Overview</h5>
+          <span class="text-muted small">OSHA TWA & Exposure Monitoring Active &bull; {{ state.workers.workers_exposed }} Personnel within hazardous perimeter</span>
+        </div>
+      </div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-sm btn-outline-warning" onclick="window.gasguardClient.speakAlert('All personnel in Zone B evacuate immediately.');"><i class="bi bi-megaphone-fill"></i> Broadcast Zone Evac</button>
+        <a href="{{ url_for('reports_view') }}" class="btn btn-sm btn-warning text-dark fw-bold"><i class="bi bi-file-earmark-medical"></i> Safety Log</a>
+      </div>
+    </div>
+  </div>
+  {% elif active_role == 'maintenance' %}
+  <!-- Maintenance View Banner -->
+  <div class="glass-panel p-3 mb-3 border-info bg-info bg-opacity-10">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+      <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-tools text-info fs-3"></i>
+        <div>
+          <h5 class="mb-0 text-white">Maintenance Engineering Telemetry</h5>
+          <span class="text-muted small">Asset Health: {{ state.equipment.average_health }}% &bull; Weakest Sensor: {{ state.sensors.health.weakest_sensor }} ({{ state.sensors.health.weakest_trust }}% Trust)</span>
+        </div>
+      </div>
+      <div class="d-flex gap-2">
+        <a href="{{ url_for('equipment_view') }}" class="btn btn-sm btn-info text-dark fw-bold"><i class="bi bi-activity"></i> Asset Diagnostics</a>
+        <a href="{{ url_for('e_nose_view') }}" class="btn btn-sm btn-outline-info"><i class="bi bi-sliders"></i> Sensor Recalibration</a>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- 8 TOP KPI STAT CARDS -->
+  <div class="row g-2 mb-3">
+    <!-- 1. Gas Status -->
+    <div class="col-6 col-md-3 col-xl">
+      <div class="glass-panel stat-card" style="--card-border-color: #06b6d4;">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="stat-title">Gas Signature</div>
+            <div class="stat-value text-info" id="kpiGasType">{{ state.gas.gas_type }}</div>
+          </div>
+          <div class="stat-icon bg-info bg-opacity-15 text-info">
+            <i class="bi bi-cloud-haze2-fill"></i>
+          </div>
+        </div>
+        <div class="stat-sub">
+          <span class="badge bg-{{ 'danger' if state.gas.status == 'Critical' else ('warning text-dark' if state.gas.status == 'Warning' else 'success') }}">{{ state.gas.status }}</span>
+          <span class="text-muted">{{ state.gas.concentration_ppm }} PPM ({{ state.gas.confidence }}%)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Risk Score -->
+    <div class="col-6 col-md-3 col-xl">
+      <div class="glass-panel stat-card" style="--card-border-color: #ef4444;">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="stat-title">Pre-Leak Risk</div>
+            <div class="stat-value text-{{ state.risk.badge_class }}" id="kpiRiskScore">{{ state.risk.risk_score }}<small class="fs-6 text-muted">/100</small></div>
+          </div>
+          <div class="stat-icon bg-{{ state.risk.badge_class }} bg-opacity-15 text-{{ state.risk.badge_class }}">
+            <i class="bi bi-shield-fill-exclamation"></i>
+          </div>
+        </div>
+        <div class="stat-sub">
+          <span class="badge badge-{{ state.risk.badge_class }}">{{ state.risk.level_text }}</span>
+          <span class="text-muted">{{ 'XGBoost ML' if state.risk.is_ml else 'Analytical Engine' }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Probable Leak Zone -->
+    <div class="col-6 col-md-3 col-xl">
+      <div class="glass-panel stat-card" style="--card-border-color: #f59e0b;">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="stat-title">Leak Location</div>
+            <div class="stat-value text-warning" id="kpiLeakZone">{{ state.localization.probable_zone }}</div>
+          </div>
+          <div class="stat-icon bg-warning bg-opacity-15 text-warning">
+            <i class="bi bi-geo-alt-fill"></i>
+          </div>
+        </div>
+        <div class="stat-sub">
+          <span class="badge bg-warning text-dark">{{ state.localization.confidence }}% Conf</span>
+          <span class="text-muted">Airflow: {{ state.localization.airflow.direction }} ({{ state.localization.airflow.speed }} m/s)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Workers at Risk -->
+    <div class="col-6 col-md-3 col-xl">
+      <div class="glass-panel stat-card" style="--card-border-color: #a855f7;">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="stat-title">Personnel At Risk</div>
+            <div class="stat-value text-purple" id="kpiWorkersAtRisk">{{ state.workers.workers_exposed }}<small class="fs-6 text-muted"> / {{ state.workers.total_workers }}</small></div>
+          </div>
+          <div class="stat-icon bg-primary bg-opacity-15 text-primary">
+            <i class="bi bi-people-fill"></i>
+          </div>
+        </div>
+        <div class="stat-sub">
+          {% if state.workers.workers_critical > 0 %}
+          <span class="badge bg-danger">{{ state.workers.workers_critical }} Critical</span>
+          {% else %}
+          <span class="badge bg-success">Nominal</span>
+          {% endif %}
+          <span class="text-muted">Wearables Active</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. Equipment Health -->
+    <div class="col-6 col-md-3 col-xl">
+      <div class="glass-panel stat-card" style="--card-border-color: #10b981;">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="stat-title">Equipment Health</div>
+            <div class="stat-value text-white" id="kpiEquipHealth">{{ state.equipment.average_health }}%</div>
+          </div>
+          <div class="stat-icon bg-success bg-opacity-15 text-success">
+            <i class="bi bi-gear-wide-connected"></i>
+          </div>
+        </div>
+        <div class="stat-sub">
+          <span class="badge bg-{{ state.equipment.lowest_asset.status_class }}">{{ state.equipment.lowest_asset.asset_id }}: {{ state.equipment.lowest_asset.health_score }}%</span>
+          <span class="text-muted">4 Monitored Assets</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6. Primary Alarm Status -->
+    <div class="col-6 col-md-3 col-xl">
+      <div class="glass-panel stat-card" style="--card-border-color: {{ '#ef4444' if state.alerts.primary_alarm.is_failed else '#f59e0b' }};">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="stat-title">Primary Alarm</div>
+            <div class="stat-value fs-5 {{ 'text-danger fw-bold' if state.alerts.primary_alarm.is_failed else 'text-warning' }}" id="kpiPrimaryAlarm">
+              {{ '❌ FAILED' if state.alerts.primary_alarm.is_failed else ('🔔 ' + state.alerts.primary_alarm.status) }}
+            </div>
+          </div>
+          <div class="stat-icon bg-danger bg-opacity-15 text-danger">
+            <i class="bi bi-bell-fill"></i>
+          </div>
+        </div>
+        <div class="stat-sub d-flex gap-1">
+          <button id="ackAlarmBtn" class="btn btn-xs btn-outline-success py-0 px-2" style="font-size: 0.75rem;">Ack</button>
+          <button id="simAlarmFailBtn" class="btn btn-xs btn-outline-danger py-0 px-2" style="font-size: 0.75rem;">Test Fail</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 7. Backup Alert Status -->
+    <div class="col-6 col-md-3 col-xl">
+      <div class="glass-panel stat-card" style="--card-border-color: #38bdf8;">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="stat-title">Backup Systems</div>
+            <div class="stat-value fs-5 {{ 'text-danger fw-bold' if state.alerts.backup_alerts.is_activated else 'text-info' }}" id="kpiBackupAlert">
+              {{ '✅ ACTIVATED' if state.alerts.backup_alerts.is_activated else 'STANDBY' }}
+            </div>
+          </div>
+          <div class="stat-icon bg-info bg-opacity-15 text-info">
+            <i class="bi bi-broadcast"></i>
+          </div>
+        </div>
+        <div class="stat-sub">
+          <span class="badge bg-{{ state.alerts.backup_alerts.badge_class }}">{{ state.alerts.backup_alerts.active_count }} / 5 Systems Active</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 8. Safety Resilience Score -->
+    <div class="col-6 col-md-3 col-xl">
+      <div class="glass-panel stat-card" style="--card-border-color: #6366f1;">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="stat-title">Safety Resilience</div>
+            <div class="stat-value text-indigo" id="kpiResilienceScore">{{ state.resilience.resilience_score }}<small class="fs-6 text-muted">/100</small></div>
+          </div>
+          <div class="stat-icon bg-indigo bg-opacity-15 text-indigo">
+            <i class="bi bi-shield-check"></i>
+          </div>
+        </div>
+        <div class="stat-sub">
+          <span class="badge bg-{{ state.resilience.badge_class }}">{{ state.resilience.tier }}</span>
+          <span class="text-danger small" title="Weakest Safety Layer">Min: {{ state.resilience.weakest_layer.layer_name }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN MIDDLE SECTION: FACTORY RISK MAP & LIVE CHARTS -->
+  <div class="row g-3 mb-3">
+    <!-- Factory Risk Map (Module 7) -->
+    <div class="col-12 col-xl-7" id="factoryMapSection">
+      <div class="glass-panel h-100">
+        <div class="glass-header">
+          <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-geo-alt text-info"></i>
+            <strong class="text-white">Dynamic Factory Risk Map (Floor Plan)</strong>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-danger" id="mapLeakZoneBadge">Probable: {{ state.localization.probable_zone }}</span>
+            <a href="{{ url_for('leak_map_view') }}" class="btn btn-sm btn-outline-light py-0 px-2" style="font-size: 0.8rem;">Full Map</a>
+          </div>
+        </div>
+        <div class="p-3">
+          <!-- Interactive SVG Map -->
+          <div class="factory-map-container" style="min-height: 380px;">
+            <svg id="factoryMapSvg" viewBox="0 0 600 450" class="w-100 h-100" style="display: block;">
+              <defs>
+                <!-- Plume Gradients -->
+                <radialGradient id="plumeCriticalGrad" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stop-color="#ef4444" stop-opacity="0.85" />
+                  <stop offset="50%" stop-color="#f97316" stop-opacity="0.45" />
+                  <stop offset="100%" stop-color="#ef4444" stop-opacity="0.0" />
+                </radialGradient>
+                <radialGradient id="plumeHighGrad" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stop-color="#f97316" stop-opacity="0.75" />
+                  <stop offset="60%" stop-color="#f59e0b" stop-opacity="0.35" />
+                  <stop offset="100%" stop-color="#f97316" stop-opacity="0.0" />
+                </radialGradient>
+                <radialGradient id="plumeWarnGrad" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.65" />
+                  <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.0" />
+                </radialGradient>
+              </defs>
+
+              <!-- ZONE A: Raw Gas Storage -->
+              <polygon id="polyZoneA" points="20,20 280,20 280,220 20,220" class="zone-polygon" fill="rgba(18, 26, 43, 0.45)" stroke="rgba(255, 255, 255, 0.1)" />
+              <text x="35" y="45" fill="#94a3b8" font-size="12" font-weight="700">ZONE A: TANK STORAGE</text>
+
+              <!-- ZONE B: Compressor & Valve Bay -->
+              <polygon id="polyZoneB" points="300,20 580,20 580,220 300,220" class="zone-polygon" fill="rgba(239, 68, 68, 0.25)" stroke="#ef4444" stroke-width="2.5" />
+              <text x="315" y="45" fill="#f87171" font-size="12" font-weight="700">ZONE B: COMPRESSOR &amp; VALVES</text>
+
+              <!-- ZONE C: Process Pipeline Corridor -->
+              <polygon id="polyZoneC" points="20,240 330,240 330,430 20,430" class="zone-polygon" fill="rgba(18, 26, 43, 0.45)" stroke="rgba(255, 255, 255, 0.1)" />
+              <text x="35" y="265" fill="#94a3b8" font-size="12" font-weight="700">ZONE C: PIPELINE CORRIDOR</text>
+
+              <!-- ZONE D: Venting & Pumps -->
+              <polygon id="polyZoneD" points="350,240 580,240 580,430 350,430" class="zone-polygon" fill="rgba(18, 26, 43, 0.45)" stroke="rgba(255, 255, 255, 0.1)" />
+              <text x="365" y="265" fill="#94a3b8" font-size="12" font-weight="700">ZONE D: PUMP &amp; VENT BAY</text>
+
+              <!-- Dynamic Simulated Gas Plume -->
+              <circle id="gasPlumeElement" cx="450" cy="120" r="85" fill="url(#plumeCriticalGrad)" class="leak-plume" />
+
+              <!-- Equipment Symbols -->
+              <!-- Valve V-01 (Zone B) -->
+              <g id="equip_V01" transform="translate(490, 160)">
+                <rect x="-14" y="-14" width="28" height="28" rx="6" fill="#1e293b" stroke="#ef4444" stroke-width="2" id="equipIcon_V-01" />
+                <text x="0" y="4" fill="#fff" font-size="9" font-weight="bold" text-anchor="middle">V-01</text>
+              </g>
+
+              <!-- Pipeline P-02 (Zone A) -->
+              <g id="equip_P02" transform="translate(190, 100)">
+                <rect x="-14" y="-14" width="28" height="28" rx="6" fill="#1e293b" stroke="#38bdf8" stroke-width="2" id="equipIcon_P-02" />
+                <text x="0" y="4" fill="#fff" font-size="9" font-weight="bold" text-anchor="middle">P-02</text>
+              </g>
+
+              <!-- Compressor C-01 (Zone C) -->
+              <g id="equip_C01" transform="translate(260, 320)">
+                <rect x="-14" y="-14" width="28" height="28" rx="6" fill="#1e293b" stroke="#f59e0b" stroke-width="2" id="equipIcon_C-01" />
+                <text x="0" y="4" fill="#fff" font-size="9" font-weight="bold" text-anchor="middle">C-01</text>
+              </g>
+
+              <!-- Pump P-04 (Zone D) -->
+              <g id="equip_P04" transform="translate(460, 330)">
+                <rect x="-14" y="-14" width="28" height="28" rx="6" fill="#1e293b" stroke="#10b981" stroke-width="2" id="equipIcon_P-04" />
+                <text x="0" y="4" fill="#fff" font-size="9" font-weight="bold" text-anchor="middle">P-04</text>
+              </g>
+
+              <!-- Virtual E-Nose Sensor Nodes (S1 to S5) -->
+              <!-- S1 (Zone A) -->
+              <g class="sensor-node" transform="translate(150, 120)">
+                <circle id="sensorNode_S1" r="10" fill="#06b6d4" stroke="#fff" stroke-width="2" />
+                <text id="sensorVal_S1" x="14" y="4" fill="#38bdf8" font-size="10" font-weight="bold">S1: 115</text>
+              </g>
+
+              <!-- S2 (Zone B) -->
+              <g class="sensor-node" transform="translate(450, 120)">
+                <circle id="sensorNode_S2" r="12" fill="#ef4444" stroke="#fff" stroke-width="2" />
+                <text id="sensorVal_S2" x="16" y="4" fill="#f87171" font-size="10" font-weight="bold">S2: 445</text>
+              </g>
+
+              <!-- S3 (Zone B) -->
+              <g class="sensor-node" transform="translate(510, 190)">
+                <circle id="sensorNode_S3" r="10" fill="#f59e0b" stroke="#fff" stroke-width="2" />
+                <text id="sensorVal_S3" x="-50" y="4" fill="#fbbf24" font-size="10" font-weight="bold">S3: 140</text>
+              </g>
+
+              <!-- S4 (Zone C) -->
+              <g class="sensor-node" transform="translate(180, 330)">
+                <circle id="sensorNode_S4" r="10" fill="#06b6d4" stroke="#fff" stroke-width="2" />
+                <text id="sensorVal_S4" x="14" y="4" fill="#38bdf8" font-size="10" font-weight="bold">S4: 102</text>
+              </g>
+
+              <!-- S5 (Zone D) -->
+              <g class="sensor-node" transform="translate(460, 330)">
+                <circle id="sensorNode_S5" r="10" fill="#06b6d4" stroke="#fff" stroke-width="2" />
+                <text id="sensorVal_S5" x="14" y="4" fill="#38bdf8" font-size="10" font-weight="bold">S5: 120</text>
+              </g>
+
+              <!-- Worker Personnel Pins (W001-W004) -->
+              <!-- W001 -->
+              <g id="workerPin_W001" class="worker-node" transform="translate(420, 140)">
+                <circle r="7" fill="#ef4444" stroke="#fff" stroke-width="1.5" />
+                <text x="9" y="3" fill="#fff" font-size="9" font-weight="bold">W001 (Op)</text>
+              </g>
+              <!-- W002 -->
+              <g id="workerPin_W002" class="worker-node" transform="translate(480, 160)">
+                <circle r="7" fill="#ef4444" stroke="#fff" stroke-width="1.5" />
+                <text x="9" y="3" fill="#fff" font-size="9" font-weight="bold">W002 (Tech)</text>
+              </g>
+              <!-- W003 -->
+              <g id="workerPin_W003" class="worker-node" transform="translate(130, 150)">
+                <circle r="7" fill="#10b981" stroke="#fff" stroke-width="1.5" />
+                <text x="9" y="3" fill="#fff" font-size="9" font-weight="bold">W003</text>
+              </g>
+              <!-- W004 -->
+              <g id="workerPin_W004" class="worker-node" transform="translate(210, 340)">
+                <circle r="7" fill="#f59e0b" stroke="#fff" stroke-width="1.5" />
+                <text x="9" y="3" fill="#fff" font-size="9" font-weight="bold">W004</text>
+              </g>
+
+              <!-- Airflow Compass Indicator -->
+              <g transform="translate(540, 50)">
+                <circle r="18" fill="rgba(15, 23, 42, 0.8)" stroke="rgba(255, 255, 255, 0.2)" />
+                <line x1="0" y1="8" x2="0" y2="-12" stroke="#06b6d4" stroke-width="2" marker-end="url(#arrow)" />
+                <text x="0" y="-14" fill="#06b6d4" font-size="8" font-weight="bold" text-anchor="middle">NE</text>
+                <text x="0" y="27" fill="#64748b" font-size="7" text-anchor="middle">2.5 m/s</text>
+              </g>
+            </svg>
+            <div id="mapTooltip" class="position-absolute bg-dark text-white p-2 rounded small border border-secondary shadow" style="display: none; pointer-events: none; z-index: 10;"></div>
+          </div>
+          <!-- Legend -->
+          <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top border-secondary border-opacity-25 small text-muted">
+            <div class="d-flex gap-3">
+              <span><i class="bi bi-circle-fill text-success"></i> Safe</span>
+              <span><i class="bi bi-circle-fill text-warning"></i> Warning</span>
+              <span><i class="bi bi-circle-fill text-danger"></i> Critical / Plume</span>
+            </div>
+            <div>
+              <span>Icons: Square = Asset &bull; Circle = Worker &bull; Dot = Sensor</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Telemetry Stream Chart & E-Nose Radar -->
+    <div class="col-12 col-xl-5">
+      <div class="row g-3 h-100">
+        <!-- Live Telemetry Trends -->
+        <div class="col-12" style="height: 240px;">
+          <div class="glass-panel h-100 p-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <strong class="text-white small"><i class="bi bi-activity text-danger"></i> Real-Time Multi-Parameter Trend</strong>
+              <span class="badge bg-dark text-muted border border-secondary">PPM &bull; Pressure &bull; Vibration</span>
+            </div>
+            <div style="height: 180px;">
+              <canvas id="telemetryTrendChart"></canvas>
+            </div>
+          </div>
+        </div>
+        <!-- E-Nose Array Radar & Resilience Breakdown -->
+        <div class="col-12" style="height: 240px;">
+          <div class="glass-panel h-100 p-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <strong class="text-white small"><i class="bi bi-shield-lock text-info"></i> Safety Resilience Layer Breakdown</strong>
+              <span class="badge bg-indigo">{{ state.resilience.resilience_score }}/100 Score</span>
+            </div>
+            <div style="height: 180px;">
+              <canvas id="resilienceBarChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOWER SECTION: XAI EXPLANATIONS, WORKERS AT RISK, ALARM REDUNDANCY -->
+  <div class="row g-3 mb-3">
+    <!-- Explainable AI (Module 12) -->
+    <div class="col-12 col-lg-5">
+      <div class="glass-panel h-100">
+        <div class="glass-header">
+          <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-lightbulb-fill text-warning"></i>
+            <strong class="text-white">Explainable AI (XAI) &bull; Root Cause Attribution</strong>
+          </div>
+          <span class="badge bg-{{ state.risk.badge_class }}">Risk: {{ state.risk.level_text }}</span>
+        </div>
+        <div class="p-3">
+          <p class="text-muted small mb-2"><strong>WHY IS THIS RISK LEVEL PREDICTED?</strong></p>
+          <div class="xai-container">
+            {% for factor in state.risk.xai.factors %}
+            <div class="xai-card {{ 'critical' if factor.severity == 'CRITICAL' else ('warning' if factor.severity == 'WARNING' else '') }}">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <strong class="text-white small">{{ factor.factor }}</strong>
+                <span class="badge bg-{{ 'danger' if factor.severity == 'CRITICAL' else ('warning text-dark' if factor.severity == 'WARNING' else 'info') }}">{{ factor.value }}</span>
+              </div>
+              <p class="text-muted small mb-1">{{ factor.reason }}</p>
+              <div class="d-flex justify-content-between align-items-center text-dim small">
+                <span>Baseline: {{ factor.normal_baseline }}</span>
+                <span class="text-info fw-bold">+{{ factor.attribution_pct }}% Risk Impact</span>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          <div class="alert alert-dark border-secondary small mb-0 mt-2">
+            <strong class="text-info"><i class="bi bi-arrow-right-circle-fill"></i> Recommended Action:</strong><br>
+            {{ state.risk.xai.recommended_action }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Redundant Backup Alert Grid (Module 8 & 9) -->
+    <div class="col-12 col-lg-4">
+      <div class="glass-panel h-100">
+        <div class="glass-header">
+          <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-layers-fill text-danger"></i>
+            <strong class="text-white">Multi-Layer Failover Matrix</strong>
+          </div>
+          <span class="badge bg-{{ state.alerts.backup_alerts.badge_class }}">{{ state.alerts.backup_alerts.overall_status }}</span>
+        </div>
+        <div class="p-3">
+          <!-- Primary Alarm Status Indicator -->
+          <div class="alarm-status-box mb-3 {{ 'alarm-box-failed' if state.alerts.primary_alarm.is_failed else ('alarm-box-active' if state.alerts.primary_alarm.is_active else 'border-secondary') }}">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <small class="text-muted text-uppercase fw-bold">Primary Alarm Channel</small>
+                <div class="fs-5 fw-bold">{{ '❌ PRIMARY SIREN FAILED' if state.alerts.primary_alarm.is_failed else ('🔔 ' + state.alerts.primary_alarm.status) }}</div>
+              </div>
+              <div>
+                {% if state.alerts.primary_alarm.is_failed %}
+                <span class="badge bg-danger">TIMEOUT / NO ACK</span>
+                {% else %}
+                <span class="badge bg-success">CIRCUIT OK</span>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+
+          <!-- 5 Redundant Backup Systems -->
+          <div class="d-flex flex-column gap-2">
+            {% for key, sys in state.alerts.backup_alerts.systems.items() %}
+            <div class="d-flex justify-content-between align-items-center p-2 rounded bg-dark bg-opacity-40 border border-secondary border-opacity-25">
+              <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-{{ 'broadcast' if sys.type == 'Visual' else ('phone' if sys.type == 'Cellular' else ('volume-up' if sys.type == 'Acoustic PA' else 'watch')) }} text-info"></i>
+                <div>
+                  <div class="text-white small fw-bold">{{ sys.name }}</div>
+                  <small class="text-muted" style="font-size: 0.72rem;">{{ sys.details }}</small>
+                </div>
+              </div>
+              <span class="badge bg-{{ 'danger' if sys.status == 'ACTIVE' else 'secondary' }}">{{ sys.status }}</span>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Worker Exposure Fleet (Module 6) -->
+    <div class="col-12 col-lg-3">
+      <div class="glass-panel h-100">
+        <div class="glass-header">
+          <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-person-lines-fill text-purple"></i>
+            <strong class="text-white">Personnel Exposure</strong>
+          </div>
+          <span class="badge bg-purple">{{ state.workers.workers_exposed }} At Risk</span>
+        </div>
+        <div class="p-3">
+          <div class="d-flex flex-column gap-2">
+            {% for w in state.workers.workers %}
+            <div class="p-2 rounded bg-dark bg-opacity-40 border border-secondary border-opacity-25">
+              <div class="d-flex justify-content-between align-items-center">
+                <strong class="text-white small">{{ w.name }}</strong>
+                <span class="badge bg-{{ w.badge_class }}">{{ w.exposure_risk }}</span>
+              </div>
+              <div class="d-flex justify-content-between align-items-center text-muted small mt-1">
+                <span>{{ w.role }} &bull; {{ w.zone }}</span>
+                <span>{{ w.local_ppm }} PPM</span>
+              </div>
+              <div class="text-danger small mt-1" style="font-size: 0.72rem;">
+                <i class="bi bi-smartwatch"></i> {{ w.wearable_status }}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RECENT INCIDENT HISTORY TABLE (Module 13) -->
+  <div class="glass-panel p-3 mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-clock-history text-info"></i>
+        <strong class="text-white">Recent Industrial Safety Incidents &amp; Replay Archive</strong>
+      </div>
+      <a href="{{ url_for('incidents_view') }}" class="btn btn-sm btn-outline-info">View All Incidents &rarr;</a>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-custom">
+        <thead>
+          <tr>
+            <th>Incident ID</th>
+            <th>Date &amp; Time</th>
+            <th>Gas Signature</th>
+            <th>Zone / Asset</th>
+            <th>Risk Level</th>
+            <th>Primary Alarm</th>
+            <th>Backup Failover</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong class="text-info">INC-2026-001</strong></td>
+            <td>Recent</td>
+            <td>Ammonia (85.4 PPM)</td>
+            <td>Zone B / Valve V-01</td>
+            <td><span class="badge bg-danger">CRITICAL</span></td>
+            <td><span class="badge bg-danger">FAILED</span></td>
+            <td><span class="badge bg-success">ACTIVATED</span></td>
+            <td><span class="badge bg-outline-success">RESOLVED</span></td>
+            <td>
+              <a href="{{ url_for('incident_replay_view', incident_id='INC-2026-001') }}" class="btn btn-xs btn-outline-light py-0 px-2" style="font-size: 0.8rem;">
+                <i class="bi bi-play-circle"></i> Replay
+              </a>
+            </td>
+          </tr>
+          <tr>
+            <td><strong class="text-info">INC-2026-002</strong></td>
+            <td>Recent</td>
+            <td>Methane (145.0 PPM)</td>
+            <td>Zone C / Compressor C-01</td>
+            <td><span class="badge bg-warning text-dark">HIGH</span></td>
+            <td><span class="badge bg-success">ACKNOWLEDGED</span></td>
+            <td><span class="badge bg-secondary">STANDBY</span></td>
+            <td><span class="badge bg-outline-success">RESOLVED</span></td>
+            <td>
+              <a href="{{ url_for('incident_replay_view', incident_id='INC-2026-002') }}" class="btn btn-xs btn-outline-light py-0 px-2" style="font-size: 0.8rem;">
+                <i class="bi bi-play-circle"></i> Replay
+              </a>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

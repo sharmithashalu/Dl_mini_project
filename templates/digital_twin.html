@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block title %}GASGUARD X - Digital Twin & What-If Simulation{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-xl-4">
+
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+      <h3 class="text-white fw-bold mb-1"><i class="bi bi-boxes text-info"></i> Module 11: Digital Twin &amp; What-If Scenario Sandbox</h3>
+      <p class="text-muted small mb-0">Software-only plant simulation to test failure modes, stress scenarios, and verify multi-layer safety resilience.</p>
+    </div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-sm btn-outline-secondary" onclick="triggerScenario('NORMAL')">
+        <i class="bi bi-arrow-counterclockwise"></i> Reset to Normal
+      </button>
+    </div>
+  </div>
+
+  <!-- Scenario Action Buttons -->
+  <div class="glass-panel p-3 mb-4">
+    <h5 class="text-white mb-2"><i class="bi bi-lightning-charge text-warning"></i> Select a Simulated Industrial Scenario:</h5>
+    <div class="d-flex flex-wrap gap-2">
+      <button class="btn btn-outline-danger" onclick="triggerScenario('GAS_LEAK', {gas: 'Ammonia', intensity: 90})">
+        <i class="bi bi-cloud-haze2-fill"></i> Simulate Ammonia Gas Leak
+      </button>
+      <button class="btn btn-outline-danger" onclick="triggerScenario('GAS_LEAK', {gas: 'Methane', intensity: 120})">
+        <i class="bi bi-fire"></i> Simulate Methane Leak
+      </button>
+      <button class="btn btn-outline-warning" onclick="triggerScenario('VALVE_FAILURE')">
+        <i class="bi bi-wrench"></i> Simulate Valve V-01 Failure
+      </button>
+      <button class="btn btn-outline-info" onclick="triggerScenario('PRESSURE_SPIKE')">
+        <i class="bi bi-speedometer2"></i> Increase Pipeline Pressure
+      </button>
+      <button class="btn btn-outline-primary" onclick="triggerScenario('REDUCE_VENTILATION')">
+        <i class="bi bi-fan"></i> Reduce Ventilation Flow
+      </button>
+      <button class="btn btn-outline-secondary" onclick="triggerScenario('SENSOR_FAILURE')">
+        <i class="bi bi-exclamation-triangle"></i> Simulate Sensor S3 Anomaly
+      </button>
+      <button class="btn btn-danger" onclick="triggerScenario('PRIMARY_ALARM_FAILURE')">
+        <i class="bi bi-bell-slash"></i> Simulate Primary Alarm Failure
+      </button>
+    </div>
+  </div>
+
+  <!-- Comparison & Live Twin State -->
+  <div class="row g-3">
+    <!-- Active Scenario Impact Table (Before vs. After Comparison) -->
+    <div class="col-12 col-xl-7">
+      <div class="glass-panel p-4 h-100">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="text-white mb-0"><i class="bi bi-arrow-left-right text-info"></i> Before vs. After Parameter Impact Comparison</h5>
+          <span class="badge bg-info text-dark" id="currentScenarioBadge">ACTIVE: {{ state.scenario }}</span>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table table-custom">
+            <thead>
+              <tr>
+                <th>Safety Metric</th>
+                <th>Baseline (Normal)</th>
+                <th>Current Simulated Value</th>
+                <th>Observed Impact / Delta</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Gas Concentration</strong></td>
+                <td class="text-muted">3.5 PPM (Clean)</td>
+                <td class="text-danger fw-bold font-monospace" id="compGasPpm">{{ state.gas.concentration_ppm }} PPM</td>
+                <td id="compGasDelta"><span class="badge bg-danger">+{{ (state.gas.concentration_ppm - 3.5)|round(1) }} PPM</span></td>
+              </tr>
+              <tr>
+                <td><strong>Pre-Leak Risk Score</strong></td>
+                <td class="text-muted">14.0 / 100 (SAFE)</td>
+                <td class="text-{{ state.risk.badge_class }} fw-bold font-monospace" id="compRiskScore">{{ state.risk.risk_score }} / 100</td>
+                <td id="compRiskDelta"><span class="badge bg-{{ state.risk.badge_class }}">{{ state.risk.level_text }}</span></td>
+              </tr>
+              <tr>
+                <td><strong>Probable Leak Zone</strong></td>
+                <td class="text-muted">None</td>
+                <td class="text-warning fw-bold" id="compLeakZone">{{ state.localization.probable_zone }}</td>
+                <td><span class="badge bg-warning text-dark">{{ state.localization.confidence }}% Confidence</span></td>
+              </tr>
+              <tr>
+                <td><strong>Workers Exposed</strong></td>
+                <td class="text-muted">0 Workers</td>
+                <td class="text-white fw-bold font-monospace" id="compWorkers">{{ state.workers.workers_exposed }} Workers</td>
+                <td><span class="badge bg-{{ 'danger' if state.workers.workers_critical > 0 else 'success' }}">{{ state.workers.workers_critical }} Critical</span></td>
+              </tr>
+              <tr>
+                <td><strong>Equipment Health Index</strong></td>
+                <td class="text-muted">94.5% (Nominal)</td>
+                <td class="text-white fw-bold font-monospace" id="compEquipHealth">{{ state.equipment.average_health }}%</td>
+                <td><span class="badge bg-{{ state.equipment.lowest_asset.status_class }}">{{ state.equipment.lowest_asset.asset_id }}: {{ state.equipment.lowest_asset.health_score }}%</span></td>
+              </tr>
+              <tr>
+                <td><strong>Primary Alarm Circuit</strong></td>
+                <td class="text-muted">STANDBY</td>
+                <td class="fw-bold {{ 'text-danger' if state.alerts.primary_alarm.is_failed else 'text-warning' }}" id="compAlarm">{{ state.alerts.primary_alarm.status }}</td>
+                <td><span class="badge bg-{{ state.alerts.primary_alarm.badge_class }}">{{ 'FAILED' if state.alerts.primary_alarm.is_failed else 'CIRCUIT OK' }}</span></td>
+              </tr>
+              <tr>
+                <td><strong>Safety Resilience Score</strong></td>
+                <td class="text-muted">92.0 / 100</td>
+                <td class="text-indigo fw-bold font-monospace" id="compResilience">{{ state.resilience.resilience_score }} / 100</td>
+                <td><span class="badge bg-{{ state.resilience.badge_class }}">{{ state.resilience.tier }}</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Side: Digital Twin Telemetry Feeds -->
+    <div class="col-12 col-xl-5">
+      <div class="glass-panel p-4 h-100">
+        <h5 class="text-white mb-3"><i class="bi bi-diagram-3-fill text-info"></i> Digital Twin Internal State Vector</h5>
+        
+        <div class="p-3 bg-dark rounded border border-secondary border-opacity-25 font-monospace text-info small mb-3">
+          <div class="text-muted mb-1">// Sensor Array Telemetry Vector</div>
+          <div>S1 (NH3): <span id="twinS1">{{ state.sensors.raw_inputs.S1 }}</span> | S2 (CH4): <span id="twinS2">{{ state.sensors.raw_inputs.S2 }}</span></div>
+          <div>S3 (CO): <span id="twinS3">{{ state.sensors.raw_inputs.S3 }}</span> | S4 (LPG): <span id="twinS4">{{ state.sensors.raw_inputs.S4 }}</span></div>
+          <div>S5 (VOC): <span id="twinS5">{{ state.sensors.raw_inputs.S5 }}</span></div>
+          <div class="mt-2 text-muted mb-1">// Hydraulic &amp; Mechanical State</div>
+          <div>Valve V-01 Pressure: <span id="twinV01P">{{ state.equipment.assets[0].pressure }}</span> bar</div>
+          <div>Valve V-01 Vibration: <span id="twinV01V">{{ state.equipment.assets[0].vibration }}</span> mm/s</div>
+        </div>
+
+        <div class="alert alert-dark border-secondary small mb-0">
+          <strong class="text-white"><i class="bi bi-info-circle text-info"></i> What-If Experimentation Guide:</strong><br>
+          Select a scenario above to test how multi-channel sensor drift or valve seal failure ripples through the pre-leak risk classifier and triggers redundant alerts.
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  async function triggerScenario(scenario, params = {}) {
+    try {
+      const res = await fetch('/api/digital-twin/scenario', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scenario: scenario, params: params })
+      });
+      const data = await res.json();
+      const state = data.state;
+
+      // Update comparison table
+      document.getElementById('currentScenarioBadge').textContent = `ACTIVE: ${scenario}`;
+      document.getElementById('compGasPpm').textContent = `${state.gas.concentration_ppm} PPM`;
+      document.getElementById('compRiskScore').textContent = `${state.risk.risk_score} / 100`;
+      document.getElementById('compLeakZone').textContent = state.localization.probable_zone;
+      document.getElementById('compWorkers').textContent = `${state.workers.workers_exposed} Workers`;
+      document.getElementById('compEquipHealth').textContent = `${state.equipment.average_health}%`;
+      document.getElementById('compAlarm').textContent = state.alerts.primary_alarm.status;
+      document.getElementById('compResilience').textContent = `${state.resilience.resilience_score} / 100`;
+
+      // Update state vector
+      document.getElementById('twinS1').textContent = state.sensors.raw_inputs.S1;
+      document.getElementById('twinS2').textContent = state.sensors.raw_inputs.S2;
+      document.getElementById('twinS3').textContent = state.sensors.raw_inputs.S3;
+      document.getElementById('twinS4').textContent = state.sensors.raw_inputs.S4;
+      document.getElementById('twinS5').textContent = state.sensors.raw_inputs.S5;
+
+      window.gasguardClient?.showToast('Digital Twin Updated', `Scenario ${scenario} injected successfully.`, 'info');
+      // Update global navbar & widgets
+      document.dispatchEvent(new CustomEvent('gasguard:stateUpdate', { detail: state }));
+    } catch (e) {
+      console.error(e);
+    }
+  }
+</script>
+{% endblock %}
